@@ -49,7 +49,7 @@ def tag_change(tag):
     return tag
 
 
-path = '../DataSets/2014人民日报/test.txt'
+path = '../../DataSets/2014人民日报/test.txt'
 outpath = '../DataSets/2014人民日报/testout.txt'
 with open(path, 'r', encoding='utf-8') as f:
     text = f.read()

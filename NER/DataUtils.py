@@ -1,6 +1,9 @@
 import io
 import json
 import os, re
+import pickle
+import random
+
 import Data_processing
 
 tag2id = {'O': 0,
@@ -18,7 +21,7 @@ RMRB_tag = {
 }
 
 
-# 取出文件夹内规定数量文件  合并为一个大文件
+# 人民日报语料库专用函数 取出文件夹内规定数量文件  合并为一个大文件
 def mergeFiles(file_dir, n, output_dir, k):
     s = ""
     i = 0
@@ -102,11 +105,7 @@ def text2BIOES(path, outpath):
         f.write(BIOES_content)
     print('done!->', path)
 
-
-def maxlen(sentences):
-    return max([len(s) for s in sentences])
-
-
+# 人民日报语料库专用 原标注转换为需要的标注
 def tag_change(tag):
     """
     原标注转换为需要的标注
@@ -119,24 +118,39 @@ def tag_change(tag):
         tag = 'O'
     return tag
 
+# 数据中句子最大长度
+def maxlen(data):
+    '''
 
-def read_train_data(traindata_path):
+    :param data: data=[[sentence],[sentence],....]
+             sentence=[[chars],[charids],[tags],[tag_ids]]
+    :return:
+    '''
+    return max([len(s[0]) for s in data ])
+
+# 读取BIOES数据，转换为模型所需的列表
+def read_train_data(traindata_path,vocab_path):
     '''
     BIOES标注好的文本 读取后转换为模型所需列表
     :param traindata_path: BIOES标注好的文本路径
     :return: data=[[sentence],[sentence],....]
-            sentence=[[chars],[tags]]
+            sentence=[[chars],[charids],[tags],[tag_ids]]
     '''
     data = []
     with io.open(traindata_path, encoding='utf-8') as fr:
         lines = fr.readlines()
-    chars, tags, tag_ids = [], [], []
+    with open(vocab_path, 'rb') as f:
+        char2id = pickle.load(f)
+
+    chars, charids, tags, tag_ids = [], [], [], []
     for line in lines:
         if line != '\n':
             # [char, label] = line.strip().split()
             try:
                 char = ''.join(line).strip().split()[0]
                 chars.append(char)
+                charid = char2id[char]
+                charids.append(charid)
                 tag = ''.join(line).strip().split()[1]
                 tags.append(tag)
                 tag_id = tag2id[tag]
@@ -146,11 +160,26 @@ def read_train_data(traindata_path):
         else:
             if len(chars) < 1 or len(tags) < 1:
                 continue
-            data.append((chars, tags, tag_ids))
-            chars, tag, tag_ids = [], [], []
+            data.append((chars, charids, tags, tag_ids))
+            chars, charids, tag, tag_ids = [], [], [], []
     print(traindata_path, ':', len(data))
     # print(data)
     return data
+
+# 建立训练数据batches
+def get_batches(data, batch_size):
+    '''
+    :param data: data=[[sentence],[sentence],....]
+             sentence=[[chars],[charids],[tags],[tag_ids]]
+    :param batch_size:
+    :return:
+    '''
+    num_batches = len(data) // batch_size
+    random.shuffle(data)
+    batches = []
+    for i in range(num_batches):
+        batches.append(data[i*batches:(i+1)*batch_size])
+    return batches
 
 
 
