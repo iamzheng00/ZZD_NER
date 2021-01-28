@@ -53,7 +53,7 @@ def test_step(model, x_test, y_test):
 # 设置摘要编写器，以将摘要写到另一个日志目录中的磁盘上：
 current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 train_log_dir = 'logs/gradient_tape/' + current_time + '/train'
-test_log_dir = 'logs/gradient_tape/' + current_time + '/test'
+test_log_dir = 'logs/gradient_tape/' + current_time + '/NER'
 train_summary_writer = tf.summary.create_file_writer(train_log_dir)
 test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 

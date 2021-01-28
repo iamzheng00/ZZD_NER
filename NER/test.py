@@ -30,52 +30,52 @@ from DataUtils import textReplace
 
 
 def isTagNeed(tag):
-	"""
-	TODO
-	是否保留
-	:param tag:
-	:return:
-	"""
-	return True
+    """
+    TODO
+    是否保留
+    :param tag:
+    :return:
+    """
+    return True
+
 
 def tag_change(tag):
-	"""
-	TODO
-	原标注转换为需要的标注
-	:param tag:
-	:return:
-	"""
-	return tag
+    """
+    TODO
+    原标注转换为需要的标注
+    :param tag:
+    :return:
+    """
+    return tag
 
 
 path = '../DataSets/2014人民日报/test.txt'
 outpath = '../DataSets/2014人民日报/testout.txt'
 with open(path, 'r', encoding='utf-8') as f:
-	text = f.read()
+    text = f.read()
 l = text.split('\n')
 q = ""
 lineno = 0
 for i in l:
-	lineno += 1
-	print(lineno)
-	if i is not '':
-		try:
-			word, tag = i.split('/')
-			if len(word) == 1:
-				q += word + '\tS-' + tag + '\n'
-			elif len(word) > 1:
-				tag = tag_change(tag)  #TODO
-				q += word[0] + '\tB-' + tag + '\n'
-				for char in word[1:-1]:
-					q += char + '\tI-' + tag + '\n'
-				q += word[-1] + '\tE-' + tag + '\n'
-		except Exception as e :
-			print(e)
-			word,_,tag = i.split('/')
-			q += '/\tS-' + tag + '\n'
-	else:
-		q += '\n'
+    lineno += 1
+    print(lineno)
+    if i is not '':
+        try:
+            word, tag = i.split('/')
+            if len(word) == 1:
+                q += word + '\tS-' + tag + '\n'
+            elif len(word) > 1:
+                tag = tag_change(tag)  # TODO
+                q += word[0] + '\tB-' + tag + '\n'
+                for char in word[1:-1]:
+                    q += char + '\tI-' + tag + '\n'
+                q += word[-1] + '\tE-' + tag + '\n'
+        except Exception as e:
+            print(e)
+            word, _, tag = i.split('/')
+            q += '/\tS-' + tag + '\n'
+    else:
+        q += '\n'
 
 with open(outpath, 'w', encoding='utf-8') as f:
-	f.write(q)
-
+    f.write(q)

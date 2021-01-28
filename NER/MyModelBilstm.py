@@ -4,7 +4,7 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow.keras.layers as layers
 from tensorflow_addons.text import crf
-
+from DataUtils import maxlen
 
 class conf():
     LSTM_dim=100
@@ -17,7 +17,8 @@ class myModel_bilstm(keras.Model):
         self.LSTM_dim = conf.LSTM_dim
         self.tag_num = conf.tag_num
         # 模型所需的层定义
-        self.embedding = layers.Embedding(10000,100, mask_zero=True)
+        self.embedding = layers.Embedding(input_dim=10000,output_dim=100, mask_zero=True)
+
         self.dense = layers.Dense(self.tag_num)
         self.fw_LSTM = layers.LSTM(units=self.LSTM_dim, return_sequences=True, go_backwards=False)
         self.bw_LSTM = layers.LSTM(units=self.LSTM_dim, return_sequences=True, go_backwards=True)
@@ -29,9 +30,6 @@ class myModel_bilstm(keras.Model):
         x = self.dense(x)
 
         return x
-
-    def embedding_layer(self):
-        pass # todo
 
     def crf_loss(self,input,tag_ids,sentence_len):
         loss, self.trans_p = crf.crf_log_likelihood(inputs=input, tag_indices=tag_ids,sequence_lengths=sentence_len)
