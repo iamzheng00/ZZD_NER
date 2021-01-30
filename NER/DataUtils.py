@@ -6,11 +6,12 @@ import random
 
 import Data_processing
 
-tag2id = {'O': 0,
-          'S-Person': 1, 'B-Person': 2, 'I-Person': 3, 'E-Person': 4,
-          'S-ORG': 5, 'B-ORG': 6, 'I-ORG': 7, 'E-ORG': 8,
-          'S-LOC': 9, 'B-LOC': 10, 'I-LOC': 11, 'E-LOC': 12,
-          'S-Time': 13, 'B-Time': 14, 'I-Time': 15, 'E-Time': 16,
+tag2id = {'<pad>': 0,
+          'O': 1,
+          'S-Person': 2, 'B-Person': 3, 'I-Person': 4, 'E-Person': 5,
+          'S-Org': 6, 'B-Org': 7, 'I-Org': 8, 'E-Org':9,
+          'S-Loc': 10, 'B-Loc': 11, 'I-Loc': 12, 'E-Loc': 13,
+          'S-Time': 14, 'B-Time': 15, 'I-Time': 16, 'E-Time': 17,
           }
 
 RMRB_tag = {
@@ -21,31 +22,7 @@ RMRB_tag = {
 }
 
 
-# 人民日报语料库专用函数 取出文件夹内规定数量文件  合并为一个大文件
-def mergeFiles(file_dir, n, output_dir, k):
-    s = ""
-    i = 0
-    fileName_list = os.listdir(file_dir)
-    for fileName in fileName_list:
-        i += 1
-        filePath = os.path.join(file_dir, fileName)
 
-        with open(filePath, 'r', encoding='utf-8') as f:
-            temp = f.read()
-            if not temp.isspace():
-                s += temp + "\n"
-        if i % n == 0:
-            newfile = os.path.join(output_dir, "{}.txt".format(i // n + k))
-            with open(newfile, "w", encoding='utf-8') as f:
-                f.write(s)
-            s = ""
-        if i == len(fileName_list):
-            newfile = os.path.join(output_dir, "{}.txt".format(i // n + 1 + k))
-            with open(newfile, "w", encoding='utf-8') as f:
-                f.write(s)
-            s = ""
-    print(i, "files have been merged. Filedir: ", file_dir)
-    return i // n + 1
 
 # 人民日报语料库专用函数
 def textReplace(text):
@@ -123,10 +100,10 @@ def maxlen(data):
     '''
 
     :param data: data=[[sentence],[sentence],....]
-             sentence=[[chars],[charids],[tags],[tag_ids]]
+             sentence=[chars]
     :return:
     '''
-    return max([len(s[0]) for s in data ])
+    return max([len(s) for s in data ])
 
 # 读取BIOES数据，转换为模型所需的列表
 def read_train_data(traindata_path,vocab_path):
@@ -148,6 +125,10 @@ def read_train_data(traindata_path,vocab_path):
             # [char, label] = line.strip().split()
             try:
                 char = ''.join(line).strip().split()[0]
+                if char.isdigit():
+                    char ='<NUM>'
+                elif ('\u0041' <= char <= '\u005a') or ('\u0061' <= char <= '\u007a'):
+                    char = '<ENG>'
                 chars.append(char)
                 charid = char2id[char]
                 charids.append(charid)
@@ -155,16 +136,50 @@ def read_train_data(traindata_path,vocab_path):
                 tags.append(tag)
                 tag_id = tag2id[tag]
                 tag_ids.append(tag_id)
-            except Exception:
+            except Exception as e:
                 print(line)
+                print(e)
         else:
             if len(chars) < 1 or len(tags) < 1:
                 continue
             data.append((chars, charids, tags, tag_ids))
-            chars, charids, tag, tag_ids = [], [], [], []
+            chars, charids, tags, tag_ids = [], [], [], []
     print(traindata_path, ':', len(data))
     # print(data)
     return data
+
+# 读取BIOES数据，仅测试用
+# def read_data_for_test(traindata_path):
+#     '''
+#     BIOES标注好的文本 读取后转换为模型所需列表
+#     :param traindata_path: BIOES标注好的文本路径
+#     :return: data=[[sentence],[sentence],....]
+#             sentence=[[chars],[charids],[tags],[tag_ids]]
+#     '''
+#     data = []
+#     with io.open(traindata_path, encoding='utf-8') as fr:
+#         lines = fr.readlines()
+#
+#     chars, tags = [], []
+#     for i,line in enumerate(lines):
+#         print(i,'--->',traindata_path)
+#         if line != '\n':
+#             # [char, label] = line.strip().split()
+#             try:
+#                 char = ''.join(line).strip().split()[0]
+#                 chars.append(char)
+#                 tag = ''.join(line).strip().split()[1]
+#                 tags.append(tag)
+#             except Exception:
+#                 print(line)
+#         else:
+#             if len(chars) < 1 or len(tags) < 1:
+#                 continue
+#             data.append(chars)
+#             chars,  tags = [], []
+#     print('::::::::::::::::::::::::::::::::', len(data))
+#     # print(data)
+#     return data
 
 # 建立训练数据batches
 def get_batches(data, batch_size):
@@ -175,16 +190,22 @@ def get_batches(data, batch_size):
     :return:
     '''
     num_batches = len(data) // batch_size
+    print(num_batches)
     random.shuffle(data)
     batches = []
     for i in range(num_batches):
-        batches.append(data[i*batches:(i+1)*batch_size])
+        batches.append(data[i*batch_size:(i+1)*batch_size])
     return batches
 
 
 
 # for NER
 if __name__ =='__main__':
-    path = r'F:\zzd\毕业论文\论文代码\DataSets\2014人民日报\BIO\1.txt'
-    data = read_train_data(path)
-    A = data
+    tpath = r'F:\zzd\毕业论文\论文代码\NER\data\someNEWS_BIOES.dev'
+    vpath = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab.pkl'
+    # data = read_train_data(tpath,vpath)
+    # batches = get_batches(data,100)
+    # print(len(batches))
+    with io.open(tpath,encoding='utf-8') as f:
+        lines = f.readlines()
+    print(lines[0])
