@@ -3,7 +3,7 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow.keras.layers as layers
 from tensorflow_addons.text import crf
-from DataUtils import maxlen, findall_tag, P_R_F1_score
+from DataUtils2 import maxlen, findall_tag, P_R_F1_score
 import time
 
 
@@ -39,31 +39,14 @@ class Model_bilstm(keras.Model):
         return tf.reduce_mean(loss)
 
 
-# 从批数据中 分离出seq_ids 和 tag_ids,以及每一句的长度列表：seq_len_list
-def get_train_data_from_batch(batch):
+
+def train_one_epoch(mymodel, charid_batches,tagid_batches,seq_len_batches, epoch_num=1):
     '''
 
-    :param batch: [[sentence],[sentence],....]
-            sentence=[[chars],[charids],[tags],[tag_ids]]
-    :return:
-    '''
-    seq_ids, tag_ids = [], []
-    for sentence in batch:
-        seq_ids.append(sentence[1])
-        tag_ids.append(sentence[3])
-    seq_len_list = [len(s) for s in seq_ids]
-    seq_ids = keras.preprocessing.sequence.pad_sequences(seq_ids, padding='post', value=0)
-    tag_ids = keras.preprocessing.sequence.pad_sequences(tag_ids, padding='post', value=0)
-    seq_ids = tf.convert_to_tensor(seq_ids, dtype='int32')
-    tag_ids = tf.convert_to_tensor(tag_ids, dtype='int32')
-    return (seq_ids, tag_ids, seq_len_list)
-
-
-def train_one_epoch(mymodel, batches, epoch_num=1):
-    '''
     :param mymodel:
-    :param batches: one batch data: [[sentence],[sentence],....]
-                           sentence=[[chars],[charids],[tags],[tag_ids]]
+    :param charid_batches: [batch_size, padded_sentence_length]
+    :param tagid_batches: [batch_size, padded_sentence_length]
+    :param seq_len_batches: [batch_size, sentence_length]
     :param epoch_num:
     :return:
     '''
@@ -73,8 +56,9 @@ def train_one_epoch(mymodel, batches, epoch_num=1):
     manager = tf.train.CheckpointManager(checkpoint, directory='checkpoints01', max_to_keep=10)
 
     # =====run model=======
-    for batch_num, batch in enumerate(batches):
-        seq_ids, tag_ids, seq_len_list = get_train_data_from_batch(batch)
+    for batch_num, seq_ids in enumerate(charid_batches):
+        tag_ids = tagid_batches[batch_num]
+        seq_len_list = seq_len_batches[batch_num]
         with tf.GradientTape() as tape:
             logits = mymodel(seq_ids)
             loss = mymodel.crf_loss(logits, tag_ids, seq_len_list)
@@ -88,32 +72,29 @@ def train_one_epoch(mymodel, batches, epoch_num=1):
         optimizer.apply_gradients(zip(grads, mymodel.trainable_variables))
         # optimizer.minimize(loss, [myModel_bilstm.trainable_variables])
         if batch_num % 20 == 0:
-            manager.save(checkpoint_number=batch_num + epoch_num * len(batches))
+            manager.save(checkpoint_number=batch_num + epoch_num * len(charid_batches))
 
 
 if __name__ == '__main__':
-    from DataUtils import read_train_data, get_batches
+    from DataUtils2 import read_train_data, get_batches
 
     starttime = time.time()
     train_data_path = r'F:\zzd\毕业论文\论文代码\NER\data\someNEWS_BIOES.dev'
     vocab_path = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab.pkl'
     data = read_train_data(train_data_path, vocab_path)
-    batches = get_batches(data, 500)
-    # seq_ids, tag_ids, seq_len_list = get_train_data_from_batch(batches[1])
-    # print('done')
-    # batches = tf.convert_to_tensor(batches,dtype='int32')
+    (charid_batches, tagid_batches, seq_len_batches) = get_batches(data, 200)
+
     endtime = time.time()
     print('batches is ready! cost time:',endtime-starttime)
     starttime= time.time()
+
     configers = conf()
     model = Model_bilstm(configers)
     for epoch in range(100):
-        train_one_epoch(model, batches, epoch_num=epoch)
+        train_one_epoch(model, charid_batches, tagid_batches, seq_len_batches, epoch_num=epoch)
 
     endtime = time.time()
     print('done!——————run time ：', str(endtime - starttime), 's.')
-
-
     #     starttime = time.time()
     # tf.test.is_gpu_available()
     # train_data_path = r'F:\zzd\毕业论文\论文代码\NER\data\someNEWS_BIOES.dev'

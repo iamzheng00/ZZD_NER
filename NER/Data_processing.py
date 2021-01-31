@@ -49,7 +49,7 @@ def mergeFiles(file_dir, n, output_dir, k):
     print(i, "files have been merged. Filedir: ", file_dir)
     return i // n + 1
 
-
+# 人民日报语料库专用 原标注转换为需要的标注
 def tag_change(tag):
     """
     原标注转换为需要的标注
@@ -62,37 +62,25 @@ def tag_change(tag):
         tag = 'O'
     return tag
 
+# 人民日报语料库专用函数 去除复合标签
+def textReplace(text):
+    """
+    去除文中[ ]复合标签内的多余标签，只取外层标签
+    :param text: 原始文本字符串
+    :return:  替换修改后的文本字符串
+    """
+    # 去除[]中多余的标签
+    flist = re.findall(r'/[a-z]{3,5}', text)
+    flist = set(flist)
+    print(flist)
 
-def read_train_data(traindata_path):
-    '''
-    读取标注好的BIOES文件，转换为模型所需的列表格式   TODO：加入 字->id 的映射
-    :param traindata_path:
-    :return:
-    '''
-    data = []
-    with io.open(traindata_path, encoding='utf-8') as fr:
-        lines = fr.readlines()
-    chars, tags, tag_ids = [], [], []
-    for line in lines:
-        if line != '\n':
-            # [char, label] = line.strip().split()
-            try:
-                char = ''.join(line).strip().split()[0]
-                chars.append(char)
-                tag = ''.join(line).strip().split()[1]
-                tags.append(tag)
-                tag_id = tag2id[tag]
-                tag_ids.append(tag_id)
-            except Exception:
-                print(line)
-        else:
-            if len(chars) < 1 or len(tags) < 1:
-                continue
-            data.append((chars, tags, tag_ids))
-            chars, tag, tag_ids = [], [], []
-    print(traindata_path, ':', len(data))
-    # print(data)
-    return data
+    def change(str):
+        str = str.group()
+        res = re.sub(r'/[a-z]{3,6}', '', str)
+        return res
+
+    newtext = re.sub('\[.*?\]', change, text)
+    return newtext
 
 # 人民日报语料库专用 转换BIOES：
 def text2BIOES(path, outpath):
@@ -185,7 +173,7 @@ def vocab_build(corpus_dir, vocab_path, min_count):
                 elif ('\u0041' <= word <='\u005a') or ('\u0061' <= word <='\u007a'):
                     word = '<ENG>'
                 if word not in word2id:
-                    word2id[word] = [len(word2id)+1, 1]
+                    word2id[word] = [len(word2id)+2, 1]
                 else:
                     word2id[word][1] += 1
         print('done!-------->',corpus_path)
@@ -200,8 +188,8 @@ def vocab_build(corpus_dir, vocab_path, min_count):
     # for word in word2id.keys():
     #     word2id[word] = new_id
     #     new_id += 1
-    # word2id['<UNK>'] = new_id
-    # word2id['<PAD>'] = 0
+    word2id['<UNK>'] = [1,0]
+    word2id['<PAD>'] = [0,0]
 
     print(len(word2id))
     with open(vocab_path, 'wb') as fw:
@@ -215,7 +203,7 @@ def BIOES_tag_trans(path,outputpath):
     with open(outputpath, 'w',encoding='utf-8') as f:
         f.write(newcontent)
 
-
+# 原计数词表转换为无计数词表
 def vocab_trans(oVocab_path,out_path):
     with open(oVocab_path,'rb') as fr:
         dict = pickle.load(fr)
@@ -224,17 +212,6 @@ def vocab_trans(oVocab_path,out_path):
     with open(out_path,'wb') as fw:
         pickle.dump(newdict,fw)
 
-# d读取词表 返回字典（字->id）
-def read_vocab(vocab_path):
-    '''
-    :param vocab_path:
-    :return:                返回一个字典
-    '''
-    # vocab_path = os.path.join(vocab_path)
-    with open(vocab_path, 'rb') as fr:
-        word2id = pickle.load(fr)
-    print('vocab_size:', len(word2id))
-    return word2id
 
 # BIO格式标注数据 转换为BIOES格式：
 def BIO2BIOES(path, outpath):
@@ -276,7 +253,7 @@ def BIO2BIOES(path, outpath):
         f.write(BIOES_content)
     print('done!->', path)
 
-
+# test
 if __name__ == '__main__':
     # indir = r'F:\zzd\毕业论文\论文代码\DataSets\2014人民日报\BIO'
     # outpath = r'F:\zzd\毕业论文\论文代码\NER\data\人民日报'
@@ -294,7 +271,19 @@ if __name__ == '__main__':
     #     text2BIOES(inputpath, outpath)
 
     # dir = r'F:\zzd\毕业论文\论文代码\NER\data'
-    vocab_cout_path = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab_count.pkl'
     new_outpath = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab.pkl'
-
+    vocab_path = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab.pkl'
+    # with open(vocab_path,'rb') as f:
+    #     dict = pickle.load(f)
+    # newdict = {}
+    # newdict['<PAD>'] = 0
+    # newdict['<UNK>'] = 1
+    # for k,v in dict.items():
+    #     newdict[k] = v+1
+    # with open(new_outpath,'wb') as f:
+    #     pickle.dump(newdict,f)
+    # print('done')
+    with open(vocab_path,'rb') as f:
+        dict = pickle.load(f)
+    print('done')
 

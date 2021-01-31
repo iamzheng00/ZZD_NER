@@ -1,81 +1,61 @@
-# encoding='utf-8'
+
+# ============TensorFlow2.0教程-Word Embedding===================
+
+
+import tensorflow as tf
+import tensorflow.keras as keras
+import tensorflow.keras.layers as layers
+import time
 import os
-import re
-from DataUtils import mergeFiles
-from DataUtils import textReplace
 
-# dir1 = "F:/zzd/毕业论文/数据集/2014人民日报（原）"
-# dir2_list = os.listdir(dir1)
-# outputdir = "F:/zzd/毕业论文/数据集/te"
-# k = 0
-# for dir2 in dir2_list:
-# 	file_dir = os.path.join(dir1, dir2)
-# 	t = mergeFiles(file_dir, 100, outputdir, k)
-# 	k = t + k
+# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-# path = "../DataSets/2014人民日报/1文本100篇"
-# filelist = os.listdir(path)
-# for file in filelist:
-#     filepath = os.path.join(path, file)
-#     with open(filepath,'r+',encoding='utf-8') as f:
-#         text = f.read()
-#         q = textReplace(text)
-#         f.seek(0)
-#         f.truncate()
-#         f.write(q)
-#     print("done! filepath: ",filepath)
-"""
-转换为BIOES
-"""
+## 1.载入数据
+start = time.time()
+vocab_size = 10000
+# with tf.device('/gpu:0'):
+(train_x, train_y), (test_x, text_y) = keras.datasets.imdb.load_data(num_words=vocab_size)
+print(train_x[0])
+print(train_y)
+print(len(train_x[0]))
+print(len(train_x))
+print(len(train_y))
 
 
-def isTagNeed(tag):
-    """
-    TODO
-    是否保留
-    :param tag:
-    :return:
-    """
-    return True
+word_index = keras.datasets.imdb.get_word_index()
+word_index = {k:(v+3) for k,v in word_index.items()}
+word_index['<PAD>'] = 0
+word_index['<START>'] = 1
+word_index['<UNK>'] = 2
+word_index['<UNUSED>'] = 3
+reverse_word_index = {v:k for k, v in word_index.items()}
+def decode_review(text):
+    return ' '.join([reverse_word_index.get(i, '?') for i in text])
+print(decode_review(train_x[0]))
+
+# with tf.device('/gpu:0'):
+maxlen = 500
+train_x = keras.preprocessing.sequence.pad_sequences(train_x,value=word_index['<PAD>'],
+                                                    padding='post', maxlen=maxlen)
+test_x = keras.preprocessing.sequence.pad_sequences(test_x,value=word_index['<PAD>'],
+                                                    padding='post', maxlen=maxlen)
+
+## 2.构建模型
+
+embedding_dim = 100
+model = keras.Sequential([
+    layers.Embedding(vocab_size, embedding_dim, input_length=maxlen),
+    layers.GlobalAveragePooling1D(),
+    layers.Dense(160, activation='relu'),
+    layers.Dense(1, activation='sigmoid')
+
+])
+model.summary()
 
 
-def tag_change(tag):
-    """
-    TODO
-    原标注转换为需要的标注
-    :param tag:
-    :return:
-    """
-    return tag
+model.compile(optimizer=keras.optimizers.Adam(),
+             loss=keras.losses.BinaryCrossentropy(),
+             metrics=['accuracy'])
+history = model.fit(train_x, train_y, epochs=30, batch_size=1024, validation_split=0.1)
 
-
-path = '../../DataSets/2014人民日报/test.txt'
-outpath = '../DataSets/2014人民日报/testout.txt'
-with open(path, 'r', encoding='utf-8') as f:
-    text = f.read()
-l = text.split('\n')
-q = ""
-lineno = 0
-for i in l:
-    lineno += 1
-    print(lineno)
-    if i is not '':
-        try:
-            word, tag = i.split('/')
-            if len(word) == 1:
-                q += word + '\tS-' + tag + '\n'
-            elif len(word) > 1:
-                tag = tag_change(tag)  # TODO
-                q += word[0] + '\tB-' + tag + '\n'
-                for char in word[1:-1]:
-                    q += char + '\tI-' + tag + '\n'
-                q += word[-1] + '\tE-' + tag + '\n'
-        except Exception as e:
-            print(e)
-            word, _, tag = i.split('/')
-            q += '/\tS-' + tag + '\n'
-    else:
-        q += '\n'
-
-with open(outpath, 'w', encoding='utf-8') as f:
-    f.write(q)
+print('===========================run time is:', time.time()-start,'seconds!')

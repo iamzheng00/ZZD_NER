@@ -4,6 +4,8 @@ import os, re
 import pickle
 import random
 import numpy as np
+from tensorflow import keras
+import tensorflow as tf
 
 tag2id = {'<pad>': 0,
           'O': 1,
@@ -95,16 +97,27 @@ def get_batches(data, batch_size):
     :param data: data=[[sentence],[sentence],....]
              sentence=[[chars],[charids],[tags],[tag_ids]]
     :param batch_size:
-    :return: [[one batch],[]...]
-            one batch: [[charids_list],[tagids_list]]
+    :return: (charid_batches,tagid_batches,seq_len_batches)
     '''
     num_batches = len(data) // batch_size
     print(num_batches)
     random.shuffle(data)
-    batches = []
+
+    charid_list = [s[1] for s in data]
+    tagid_list = [s[3] for s in data]
+    seq_len_list = [len(s) for s in charid_list]
+    charid_list_padded = keras.preprocessing.sequence.pad_sequences(charid_list, padding='post', value=0)
+    tagid_list_padded = keras.preprocessing.sequence.pad_sequences(tagid_list, padding='post', value=0)
+
+    charid_batches, tagid_batches, seq_len_batches = [], [], []
     for i in range(num_batches):
-        batches.append(data[i*batch_size:(i+1)*batch_size])
-    return batches
+        charid_batches.append(charid_list_padded[i * batch_size:(i + 1) * batch_size])
+        tagid_batches.append(tagid_list_padded[i * batch_size:(i + 1) * batch_size])
+        seq_len_batches.append(seq_len_list[i * batch_size:(i + 1) * batch_size])
+
+    charid_batches = tf.convert_to_tensor(charid_batches, dtype='int32')
+    tagid_batches = tf.convert_to_tensor(tagid_batches, dtype='int32')
+    return (charid_batches, tagid_batches, seq_len_batches)
 
 
 # 提取真实和预测的序列标签 标签的偏移和混淆都不计入提取范围
