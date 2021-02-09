@@ -20,17 +20,15 @@ class Model_bilstm(keras.Model):
         self.tag_num = conf.tag_num
         # 模型所需的层定义
         self.embedding = layers.Embedding(input_dim=10000, output_dim=100, mask_zero=True)
-
-        self.dense = layers.Dense(self.tag_num)
         self.fw_LSTM = layers.LSTM(units=self.LSTM_dim, return_sequences=True, go_backwards=False)
         self.bw_LSTM = layers.LSTM(units=self.LSTM_dim, return_sequences=True, go_backwards=True)
         self.BiLSTM = layers.Bidirectional(self.fw_LSTM, backward_layer=self.bw_LSTM)
+        self.dense = layers.Dense(self.tag_num)
 
     def call(self, inputs, training=None, mask=None):
         x = self.embedding(inputs)
         x = self.BiLSTM(x)
         x = self.dense(x)
-
         return x
 
     def crf_loss(self, input, tag_ids, sentence_len_list):
@@ -64,10 +62,10 @@ def train_one_epoch(mymodel, charid_batches,tagid_batches,seq_len_batches, epoch
             loss = mymodel.crf_loss(logits, tag_ids, seq_len_list)
             pred_tags, pred_best_score = crf.crf_decode(potentials=logits, transition_params=mymodel.trans_p,
                                                         sequence_length=seq_len_list)
-        p_tags = findall_tag(pred_tags)
-        t_tags = findall_tag(tag_ids)
-        (P, R, F1) = P_R_F1_score(p_tags, t_tags)
-        print('epoch:{}\t\tbatch:{}\t\tloss:{:.2f}\t\tP :{:.8f}\t\tR :{:.8f}\t\tF1 :{:.8f}\t\t'.format(epoch_num,batch_num, loss, P, R, F1))
+        # p_tags = findall_tag(pred_tags)
+        # t_tags = findall_tag(tag_ids)
+        # (P, R, F1) = P_R_F1_score(p_tags, t_tags)
+        print('epoch:{}\t\tbatch:{}\t\tloss:{:.2f}\t\tP :{:.8f}\t\tR :{:.8f}\t\tF1 :{:.8f}\t\t'.format(epoch_num,batch_num, loss, 0, 0, 0))
         grads = tape.gradient(loss, mymodel.trainable_variables)
         optimizer.apply_gradients(zip(grads, mymodel.trainable_variables))
         # optimizer.minimize(loss, [myModel_bilstm.trainable_variables])

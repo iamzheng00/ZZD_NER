@@ -107,8 +107,9 @@ def get_batches(data, batch_size):
     return batches
 
 
-# 提取真实和预测的序列标签 标签的偏移和混淆都不计入提取范围
-def findall_tag(tag_ids):
+
+# 提取真实和预测的 有效序列标签 标签的偏移和混淆都不计入提取范围
+def findall_tag(tag_ids,seq_len_list):
     '''
     只识别连续的BIE、和S标注的位置
     :param tag_ids: [batchesize, seq_length]
@@ -119,13 +120,16 @@ def findall_tag(tag_ids):
     tags_flatten = np.array(tag_ids).flatten()
     key = ''
     for i, tag in enumerate(tags_flatten):
+        if tags_flatten[i] == 0:
+            key = ''
+            continue
         if tag % 4 == 2:
             key = str(i)
             tag_dict[key] = tag
             key = ''
-        elif tag % 4 == 3 and i + 1 < len(tags_flatten) and (tag + 1 <= tags_flatten[i + 1] <= tag + 2):
+        elif tag % 4 == 3 and (tag + 1 <= tags_flatten[i + 1] <= tag + 2):
             key = str(i) + '.'
-        elif tag % 4 == 0 and tag != 0 and i + 1 < len(tags_flatten) and (tag <= tags_flatten[i + 1] <= tag + 1):
+        elif tag % 4 == 0 and tag != 0 and (tag <= tags_flatten[i + 1] <= tag + 1):
             key += str(i) + '.'
         elif tag % 4 == 1 and key is not '':
             key += str(i) + '.'
