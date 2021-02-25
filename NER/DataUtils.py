@@ -107,7 +107,6 @@ def get_batches(data, batch_size):
     return batches
 
 
-
 # 提取真实和预测的 有效序列标签 标签的偏移和混淆都不计入提取范围
 def findall_tag(tag_ids,seq_len_list):
     '''
@@ -120,6 +119,7 @@ def findall_tag(tag_ids,seq_len_list):
     tags_flatten = np.array(tag_ids).flatten()
     key = ''
     for i, tag in enumerate(tags_flatten):
+
         if tags_flatten[i] == 0:
             key = ''
             continue
@@ -129,8 +129,11 @@ def findall_tag(tag_ids,seq_len_list):
             key = ''
         elif tag % 4 == 3 and (tag + 1 <= tags_flatten[i + 1] <= tag + 2):
             key = str(i) + '.'
-        elif tag % 4 == 0 and tag != 0 and (tag <= tags_flatten[i + 1] <= tag + 1):
-            key += str(i) + '.'
+        elif tag % 4 == 0 and tag != 0:
+            if i+1 < len(tags_flatten) and (tag <= tags_flatten[i + 1] <= tag + 1):
+                key += str(i) + '.'
+            else:
+                key = ''
         elif tag % 4 == 1 and key is not '':
             key += str(i) + '.'
             tag_dict[key] = tag
@@ -138,6 +141,23 @@ def findall_tag(tag_ids,seq_len_list):
         else:
             key = ''
     return tag_dict
+
+# 解析标签id
+def get_id2tag(tag_list):
+    '''
+
+    :param tag_list:  [batchsize, seq_length]
+    :return:
+    '''
+
+    list = np.array(tag_list).flatten()
+    id2tag = {tag2id[k]:k for k in tag2id.keys()}
+    newtag_list = []
+    for i in range(len(list)):
+        if list[i]!=0:
+            newtag_list.append(id2tag[list[i]])
+    return newtag_list,list
+
 
 # 计算P、R、F1值   标签的偏移和混淆都不计入正确预测的范围
 def P_R_F1_score(p_dict: dict, t_dict: dict) -> (float,float,float):
