@@ -150,13 +150,13 @@ def get_id2tag(tag_list):
     :return:
     '''
 
-    list = np.array(tag_list).flatten()
+    tag_list_flatten = np.array(tag_list).flatten()
     id2tag = {tag2id[k]:k for k in tag2id.keys()}
     newtag_list = []
-    for i in range(len(list)):
-        if list[i]!=0:
-            newtag_list.append(id2tag[list[i]])
-    return newtag_list,list
+    for i in range(len(tag_list_flatten)):
+        if tag_list_flatten[i]!=0:
+            newtag_list.append(id2tag[tag_list_flatten[i]])
+    return newtag_list,tag_list_flatten
 
 
 # 计算P、R、F1值   标签的偏移和混淆都不计入正确预测的范围

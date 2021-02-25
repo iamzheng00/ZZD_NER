@@ -96,49 +96,53 @@ def train_one_epoch(mymodel,optimizer,batches, epoch_num=1, checkpoints_dir='che
         ckpt_manager = tf.train.CheckpointManager(checkpoint, directory=checkpoints_dir, max_to_keep=10)
 
     batch_size = len(batches)
+    print('========================batchsiez',batch_size)
 
     # =====run model=======
-    for batch_num in tqdm(range(len(batches))):
+    with tqdm(total=batch_size) as bar:
+        for batch_num in range(batch_size):
 
-        batch = batches[batch_num]
-        seq_ids_padded, tag_ids_padded, seq_len_list = get_train_data_from_batch(batch)
-        with tf.GradientTape() as tape:
-            logits = mymodel(seq_ids_padded)
-            loss = mymodel.crf_loss(logits, tag_ids_padded, seq_len_list)
-            pred_tags, pred_best_score = crf.crf_decode(potentials=logits, transition_params=mymodel.trans_p,
-                                                        sequence_length=seq_len_list)
-        grads = tape.gradient(loss, mymodel.trainable_variables)
-        optimizer.apply_gradients(zip(grads, mymodel.trainable_variables))
-        # optimizer.minimize(loss, [myModel_bilstm.trainable_variables])
-        if batch_num % 2 == 0:
-            pred_tags_masked = seq_masking(pred_tags, seq_len_list)
-            p_tags = findall_tag(pred_tags_masked, seq_len_list)
-            t_tags = findall_tag(tag_ids_padded, seq_len_list)
-            (P_train, R_train, F1_train) = P_R_F1_score(p_tags, t_tags)
-            p_tags_char , p_tagsid_flatten = get_id2tag(pred_tags_masked)
-            t_tags_char,t_tagsid_flatten = get_id2tag(tag_ids_padded)
-            print('====epoch:{}=========batchnum:{}=========================================================='.format(epoch_num,batch_num))
-            try:
-                P_C, R_C, F1_C = evaluate(t_tags_char,p_tags_char,verbose=True)
-            except Exception as e:
-                print(e)
+            batch = batches[batch_num]
+            seq_ids_padded, tag_ids_padded, seq_len_list = get_train_data_from_batch(batch)
+            with tf.GradientTape() as tape:
+                logits = mymodel(seq_ids_padded)
+                loss = mymodel.crf_loss(logits, tag_ids_padded, seq_len_list)
+                pred_tags, pred_best_score = crf.crf_decode(potentials=logits, transition_params=mymodel.trans_p,
+                                                            sequence_length=seq_len_list)
+            grads = tape.gradient(loss, mymodel.trainable_variables)
+            optimizer.apply_gradients(zip(grads, mymodel.trainable_variables))
+            # optimizer.minimize(loss, [myModel_bilstm.trainable_variables])
 
-            step = batch_num + 1 + epoch_num * batch_size
-            tf.summary.scalar("train_loss", loss, step=step)
-            tf.summary.scalar("P_train", P_train, step=step)
-            tf.summary.scalar("R_train", R_train, step=step)
-            tf.summary.scalar("F1_train", F1_train, step=step)
-            tf.summary.scalar("P_C", P_C, step=step)
-            tf.summary.scalar("R_C", R_C, step=step)
-            tf.summary.scalar("F1_C", F1_C, step=step)
+            bar.update(1)
 
-            print(
-                'epoch:{}\t\tbatch:{}\t\ttrain_loss:{:.2f}\t\ttrain_P :{:.8f}\t\ttrain_R :{:.8f}\t\ttrain_F1 :{:.8f}\t\t'.format(
-                    epoch_num,
-                    batch_num,
-                    loss,
-                    P_train, R_train, F1_train))
-    ckpt_manager.save(checkpoint_number=epoch_num)
+            if batch_num % 2 == 0:
+                pred_tags_masked = seq_masking(pred_tags, seq_len_list)
+                p_tags = findall_tag(pred_tags_masked, seq_len_list)
+                t_tags = findall_tag(tag_ids_padded, seq_len_list)
+                (P_train, R_train, F1_train) = P_R_F1_score(p_tags, t_tags)
+                p_tags_char , p_tagsid_flatten = get_id2tag(pred_tags_masked)
+                t_tags_char,t_tagsid_flatten = get_id2tag(tag_ids_padded)
+                try:
+                    P_C, R_C, F1_C = evaluate(t_tags_char,p_tags_char,verbose=True)
+                except Exception as e:
+                    print(e)
+
+                step = batch_num + 1 + epoch_num * batch_size
+                tf.summary.scalar("train_loss", loss, step=step)
+                tf.summary.scalar("P_train", P_train, step=step)
+                tf.summary.scalar("R_train", R_train, step=step)
+                tf.summary.scalar("F1_train", F1_train, step=step)
+                tf.summary.scalar("P_C", P_C, step=step)
+                tf.summary.scalar("R_C", R_C, step=step)
+                tf.summary.scalar("F1_C", F1_C, step=step)
+
+                print(
+                    'epoch:{}\t\tbatch:{}\t\ttrain_loss:{:.2f}\t\ttrain_P :{:.8f}\t\ttrain_R :{:.8f}\t\ttrain_F1 :{:.8f}\t\t'.format(
+                        epoch_num,
+                        batch_num,
+                        loss,
+                        P_train, R_train, F1_train))
+        ckpt_manager.save(checkpoint_number=epoch_num)
 
 
 if __name__ == '__main__':
@@ -150,7 +154,7 @@ if __name__ == '__main__':
 
     datas = []
     vocab_path = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab.pkl'
-    for i in range(2):
+    for i in range(3):
         train_data_path = os.path.join(train_data_dir, train_files[i])
         data = read_train_data(train_data_path, vocab_path)
         datas.extend(data)
