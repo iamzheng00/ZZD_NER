@@ -192,14 +192,16 @@ def get_result(correct_chunks, true_chunks, pred_chunks,
     print("precision: %6.2f%%; recall: %6.2f%%; FB1: %6.2f" % (prec, rec, f1))
 
     # for each chunk type, compute precision, recall and FB1 (default values are 0.0)
+    label_dict = {}
     for t in chunk_types:
         prec, rec, f1 = calc_metrics(correct_chunks[t], pred_chunks[t], true_chunks[t])
         print("%17s: " %t , end='')
         print("precision: %6.2f%%; recall: %6.2f%%; FB1: %6.2f" %
                     (prec, rec, f1), end='')
         print("  %d" % pred_chunks[t])
+        label_dict[t] = (prec,rec,f1)
 
-    return res
+    return res,label_dict
     # you can generate LaTeX output for tables like in
     # http://cnts.uia.ac.be/conll2003/ner/example.tex
     # but I'm not implementing this
@@ -207,9 +209,9 @@ def get_result(correct_chunks, true_chunks, pred_chunks,
 def evaluate(true_seqs, pred_seqs, verbose=True):
     (correct_chunks, true_chunks, pred_chunks,
         correct_counts, true_counts, pred_counts) = count_chunks(true_seqs, pred_seqs)
-    result = get_result(correct_chunks, true_chunks, pred_chunks,
+    result,label_result = get_result(correct_chunks, true_chunks, pred_chunks,
         correct_counts, true_counts, pred_counts, verbose=verbose)
-    return result
+    return result,label_result
 
 def evaluate_conll_file(fileIterator):
     true_seqs, pred_seqs = [], []

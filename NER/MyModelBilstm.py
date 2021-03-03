@@ -6,15 +6,15 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow.keras.layers as layers
 from tensorflow_addons.text import crf
-from DataUtils import maxlen, findall_tag, P_R_F1_score,get_id2tag
+from Utils import maxlen, findall_tag, P_R_F1_score,get_id2tag
 import time
 from tqdm import tqdm
 from conlleval import evaluate
 
-tf.config.set_soft_device_placement(True)
-gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
-for gpu in gpus:
-    tf.config.experimental.set_memory_growth(gpu, True)
+# tf.config.set_soft_device_placement(True)
+# gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
+# for gpu in gpus:
+#     tf.config.experimental.set_memory_growth(gpu, True)
 
 
 class conf():
@@ -146,7 +146,7 @@ def train_one_epoch(mymodel,optimizer,batches, epoch_num=1, checkpoints_dir='che
 
 
 if __name__ == '__main__':
-    from DataUtils import read_train_data, get_batches
+    from Utils import read_train_data, get_batches
 
     starttime = time.time()
     train_data_dir = r'F:\zzd\毕业论文\论文代码\NER\data_split\MSRA'

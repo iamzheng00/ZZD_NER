@@ -4,6 +4,8 @@ import os, re
 import pickle
 import random
 import numpy as np
+import tensorflow as tf
+import tensorflow.keras as keras
 
 tag2id = {'<pad>': 0,
           'O': 1,
@@ -89,8 +91,8 @@ def read_train_data(traindata_path, vocab_path):
     return data
 
 
-# 建立训练数据batches
-def get_batches(data, batch_size):
+# 原始data转换成batches
+def data_to_batches(data, batch_size):
     '''
     :param data: data=[[sentence],[sentence],....]
              sentence=[[chars],[charids],[tags],[tag_ids]]
@@ -103,12 +105,68 @@ def get_batches(data, batch_size):
     random.shuffle(data)
     batches = []
     for i in range(num_batches):
-        batches.append(data[i*batch_size:(i+1)*batch_size])
+        batches.append(data[i * batch_size:(i + 1) * batch_size])
+    return batches
+
+# 获得训练batches
+def get_batches(train_data_dir,data_file_Num,batchsize):
+    '''
+
+    :param train_data_dir:
+    :param data_file_Num: 从源训练数据文件中读取的文件数量（读取的所有训练文件 制作为一个batches）
+    :param batchsize:
+    :return:
+    '''
+    train_files = os.listdir(train_data_dir)
+
+    # 准备数据
+    datas = []
+    vocab_path = 'vocab/vocab.pkl'
+    for i in range(data_file_Num):
+        train_data_path = os.path.join(train_data_dir, train_files[i])
+        data = read_train_data(train_data_path, vocab_path)
+        datas.extend(data)
+    batches = data_to_batches(datas, batch_size=batchsize)
     return batches
 
 
+# 从批数据中 分离出seq_ids 和 tag_ids,以及每一句的长度列表：seq_len_list
+def get_train_data_from_batch(batch):
+    '''
+    :param batch: [[sentence],[sentence],....]
+            sentence=[[chars],[charids],[tags],[tag_ids]]
+    :return:
+    '''
+    seq_ids, tag_ids = [], []
+    for sentence in batch:
+        seq_ids.append(sentence[1])
+        tag_ids.append(sentence[3])
+    seq_len_list = [len(s) for s in seq_ids]
+    seq_ids = keras.preprocessing.sequence.pad_sequences(seq_ids, maxlen=max(seq_len_list), padding='post', value=0)
+    seq_ids = keras.preprocessing.sequence.pad_sequences(seq_ids, maxlen=max(seq_len_list) + 1, padding='post', value=0)
+    tag_ids = keras.preprocessing.sequence.pad_sequences(tag_ids, maxlen=max(seq_len_list), padding='post', value=0)
+    tag_ids = keras.preprocessing.sequence.pad_sequences(tag_ids, maxlen=max(seq_len_list) + 1, padding='post', value=0)
+    seq_ids = tf.convert_to_tensor(seq_ids, dtype='int32')
+    tag_ids = tf.convert_to_tensor(tag_ids, dtype='int32')
+    return (seq_ids, tag_ids, seq_len_list)
+
+
+# 将序列实际长度之后的位变为0
+def seq_masking(seqs, lens):
+    '''
+    将序列实际长度之后的位变为0
+    :param seqs: [seqs_num, max_seq_len]
+    :param lens: [seqs_num] 每一句的实际长度
+    :return: [seqs_num, max_seq_len] 实际长度以后的位置都为0
+    '''
+    maxl = max(lens) + 1
+    mask = tf.sequence_mask(lengths=lens, maxlen=maxl, dtype=tf.int32)
+    seqs_masked = seqs * mask
+    return seqs_masked
+
+
 # 提取真实和预测的 有效序列标签 标签的偏移和混淆都不计入提取范围
-def findall_tag(tag_ids,seq_len_list):
+def findall_tag(tag_ids, seq_len_list):
     '''
     只识别连续的BIE、和S标注的位置
     :param tag_ids: [batchesize, seq_length]
@@ -130,7 +188,7 @@ def findall_tag(tag_ids,seq_len_list):
         elif tag % 4 == 3 and (tag + 1 <= tags_flatten[i + 1] <= tag + 2):
             key = str(i) + '.'
         elif tag % 4 == 0 and tag != 0:
-            if i+1 < len(tags_flatten) and (tag <= tags_flatten[i + 1] <= tag + 1):
+            if i + 1 < len(tags_flatten) and (tag <= tags_flatten[i + 1] <= tag + 1):
                 key += str(i) + '.'
             else:
                 key = ''
@@ -142,25 +200,26 @@ def findall_tag(tag_ids,seq_len_list):
             key = ''
     return tag_dict
 
-# 解析标签id
+
+# 解析标签id-->输出一个flatten列表
 def get_id2tag(tag_list):
     '''
 
     :param tag_list:  [batchsize, seq_length]
-    :return:
+    :return: 一维list
     '''
 
     tag_list_flatten = np.array(tag_list).flatten()
-    id2tag = {tag2id[k]:k for k in tag2id.keys()}
+    id2tag = {tag2id[k]: k for k in tag2id.keys()}
     newtag_list = []
     for i in range(len(tag_list_flatten)):
-        if tag_list_flatten[i]!=0:
+        if tag_list_flatten[i] != 0:
             newtag_list.append(id2tag[tag_list_flatten[i]])
-    return newtag_list,tag_list_flatten
+    return newtag_list, tag_list_flatten
 
 
 # 计算P、R、F1值   标签的偏移和混淆都不计入正确预测的范围
-def P_R_F1_score(p_dict: dict, t_dict: dict) -> (float,float,float):
+def P_R_F1_score(p_dict: dict, t_dict: dict) -> (float, float, float):
     '''
     :param p_dict: 所有预测出的标签的字典
     :param t_dict: 所有真实标签的字典
@@ -182,15 +241,70 @@ def P_R_F1_score(p_dict: dict, t_dict: dict) -> (float,float,float):
     else:
         R = count / len(t_dict.keys())
 
-    if P+R==0:
+    if P + R == 0:
         F1 = 0.0
     else:
         F1 = 2 * P * R / (P + R)
 
-    return (P,R,F1)
+    return (P, R, F1)
 
 
+# 查找已记录的epoch数
+def get_epochNum(recordFileName):
+    '''
+    若不存在则创建记录目录，并初始化epochNum为0
+    :param recordFileName:
+    :return:
+    '''
+    epoch_dir = os.path.join(recordFileName, 'epoch_record')
+    if os.path.exists(epoch_dir):
+        epoch_num = int(os.listdir(epoch_dir)[0])
+    else:
+        os.mkdir(epoch_dir)
+        epochFilePath = os.path.join(epoch_dir, '0')
+        fd = open(epochFilePath, 'w')
+        fd.close()
+        epoch_num = 0
+    return epoch_num
 
+
+# 记录全局epoch
+def Record_epoch_num(recordFileName, epoch_num):
+    '''
+    记录全局epoch
+    :param epoch_dir: 记录epoch文件的目录
+    :param epoch_num: 之前epoch值
+    :return:  当前epoch值
+    '''
+    epoch_dir = os.path.join(recordFileName, 'epoch_record')
+    os.chdir(epoch_dir)
+    new_num = epoch_num + 1
+    os.rename(str(epoch_num), str(new_num))
+    epoch_num = new_num
+    os.chdir('..')
+    os.chdir('..')
+    return epoch_num
+
+
+# 创建实验记录的文件目录
+def create_record_dirs(recordname):
+    if not os.path.exists(recordname):
+        checkpoints_dir = recordname + '\checkpoints'
+        init_theta_dir = recordname + '\\theta_0'
+        target_theta_dir = recordname + '\\theta_t'
+        tensorboard_dir = recordname + '\\tensorboard'
+        li = [checkpoints_dir, init_theta_dir, target_theta_dir, tensorboard_dir]
+        for p in li:
+            os.makedirs(p)
+
+
+# 记录测试的P R F1值
+def write_to_log(loss,P,R,F1,label_dict,log_writer,epochNum):
+    with log_writer.as_default():
+        tf.summary.scalar("loss", loss, step=epochNum)
+        tf.summary.scalar("P", P, step=epochNum)
+        tf.summary.scalar("R", R, step=epochNum)
+        tf.summary.scalar("F1", F1, step=epochNum)
 
 #  test
 if __name__ == '__main__':
