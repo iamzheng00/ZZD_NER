@@ -69,7 +69,7 @@ class Model_bilstm(keras.Model):
 
 
 
-    def inner_train_one_step(self, batches, inner_epochNum, ckpt_manager, log_writer=None):
+    def inner_train_one_step(self, batches, inner_epochNum, log_writer=None):
         '''
         :param self:
         :param batches: one batch data: [[sentence],[sentence],....]
@@ -79,7 +79,6 @@ class Model_bilstm(keras.Model):
         '''
 
         batch_size = len(batches)
-        print('========================batchsiez', batch_size)
 
         # =====run model=======
         with tqdm(total=batch_size) as bar:
@@ -112,6 +111,5 @@ class Model_bilstm(keras.Model):
                 tf.summary.scalar("R", R_t, step=inner_epochNum)
                 tf.summary.scalar("F", F1_t, step=inner_epochNum)
 
-            ckpt_manager.save(checkpoint_number=inner_epochNum)
 
 # if __name__ == '__main__':

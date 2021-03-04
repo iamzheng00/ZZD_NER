@@ -306,13 +306,23 @@ def write_to_log(loss,P,R,F1,label_dict,log_writer,epochNum):
         tf.summary.scalar("R", R, step=epochNum)
         tf.summary.scalar("F1", F1, step=epochNum)
 
-#  test
-if __name__ == '__main__':
-    tpath = r'F:\zzd\毕业论文\论文代码\NER\data\someNEWS_BIOES.dev'
-    vpath = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab.pkl'
-    # data = read_train_data(tpath,vpath)
-    # batches = get_batches(data,100)
-    # print(len(batches))
-    with io.open(tpath, encoding='utf-8') as f:
-        lines = f.readlines()
-    print(lines[0])
+
+# ====================functions in Reptile=========================
+
+# 计算各任务训练参数的平均值
+def average_vars(vars_list):
+    res = []
+    for variables in zip(*vars_list):
+        res.append(np.mean(variables, axis=0))
+    return res
+
+# outer loop 更新参数
+def update_vars(myModel, vars_list,epsilon):
+    t_var = average_vars(vars_list)
+    oldvar = myModel.get_weights()
+    newvar = [v2+epsilon*(v1-v2) for v1,v2 in zip(t_var,oldvar)]
+    myModel.set_weights(newvar)
+
+
+
+
