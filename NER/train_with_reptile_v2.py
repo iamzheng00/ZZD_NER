@@ -38,36 +38,39 @@ else:
 # log_dir_test = recordFileName + '/tensorboard/' + datetime.datetime.now().strftime("%Y%m%d-%H%M") + '-test'
 log_dir_train = recordFileName + '/tensorboard/' + '-train'
 log_dir_test = recordFileName + '/tensorboard/' + '-test'
-summary_dir = recordFileName + '/tensorboard/' + '-summary'
 
 log_writer_train = tf.summary.create_file_writer(log_dir_train)
 log_writer_test = tf.summary.create_file_writer(log_dir_test)
-summary_writer = tf.summary.create_file_writer(summary_dir)
 
-# 获取数据
-train_data_dir = 'data_split/MSRA'
-batches = get_batches_v1(train_data_dir, 10, configers.batchsize)
 
-train_batches = batches[0:3]
-test_batch = batches[5]
 print('batches is ready!\n'
       '-----------------------------------------------------------\n')
+
+tasks = ['address','scene','government','organization','company',
+            'position','name','game','book','movie']
 
 inner_epochNum = 20
 e = 0.1
 
-tf.summary.trace_on(graph=True, profiler=True)  # 开启Trace，可以记录图结构和profile信息
 
-for epoch in range(epochNum + 1000):
+
+for epoch in range(epochNum + 100):
+    starttime = time.time()
+    print('====outer epoch:{}==========================================='.format(epoch))
     vars_list = []
-    # for taskName in tasks:
-    for taskName in ['1','2','3']:
-        myModel.load_weights(ckpt_dir_theta_0 + '/ckpt_theta_0')
-        for i in range(inner_epochNum):
-            starttime = time.time()
-            myModel.inner_train_one_step(train_batches, inner_epochNum=i, log_writer=log_writer_train)
-            endtime = time.time()
-            print('done inner epoch:{}!——————run time ：{}s.'.format(i,str(endtime - starttime)) )
+    task_samples = random.sample(tasks,5)
+    for i,taskName in enumerate(task_samples):
+        print('task:{}================'.format(taskName))
+        if epoch == 0:
+            myModel.load_weights(ckpt_dir_theta_0 + '/ckpt_theta_0')
+        else:
+            myModel.load_weights(ckpt_dir_theta_t + '/ckpt_theta_t')
+        train_data_path = 'data_tasks/' + taskName
+        batches = get_batches_v2(train_data_path,batch_size=200,batch_num=3,taskname=taskName)
+        with tqdm(total=inner_epochNum) as bar:
+            for i in range(inner_epochNum):
+                myModel.inner_train_one_step(batches, inner_epochNum=i, taskname=taskName, log_writer=log_writer_train)
+                bar.update(1)
 
         myModel.save_weights(ckpt_dir_inner + '/ckpt_'+ taskName)
         vars_list.append(myModel.get_weights())
@@ -79,14 +82,16 @@ for epoch in range(epochNum + 1000):
         # (P, R, F1),label_result = evaluate(t_tags_char, p_tags_char, verbose=True)
         # write_to_log(test_loss,P,R,F1,label_result,log_writer_test,epochNum)
 
+
     # 更新模型初始化参数
     update_vars(myModel,vars_list,e)
     myModel.save_weights(ckpt_dir_theta_t + '/ckpt_theta_t')
-    with summary_writer.as_default():
-        tf.summary.trace_export(name="model_trace", step=epoch, profiler_outdir=summary_dir)
 
     # 记录epoch
     Record_epoch_num(recordFileName, epoch)
+
+    endtime = time.time()
+    print('done inner epoch:{}!——————run time ：{}s.\n'.format(i,str(endtime - starttime)) )
 
 #     starttime = time.time()
 # tf.test.is_gpu_available()

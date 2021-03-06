@@ -2,6 +2,7 @@ import io
 import os
 import pickle
 import re
+import sys
 
 tag2id = {'<pad>': 0,
           'O': 1,
@@ -150,7 +151,7 @@ def merge_BIOES_files(dir, output_path):
         f.write(content_merged)
 
 # 根据语料 建立词表映射（字<->id）[语料是已经转换为BIOES的文件]
-def vocab_build(corpus_dir, vocab_path, min_count):
+def vocab_build(corpus_dir, vocab_path, min_count=0):
     '''
 
     :param corpus_path: 语料路径
@@ -160,23 +161,37 @@ def vocab_build(corpus_dir, vocab_path, min_count):
     '''
     files = os.listdir(corpus_dir)
     word2id = {}
+    word2id['<ENG>'] = [3, 0]
+    word2id['<NUM>'] = [2, 0]
+    word2id['<UNK>'] = [1, 999]
+    word2id['<PAD>'] = [0, 999]
+
     for file in files:
         corpus_path = os.path.join(corpus_dir, file)
         with io.open(corpus_path,'r',encoding='utf-8') as f:
             lines = f.readlines()
-        for line in lines:
-            line = line.strip()
-            if line is not '':
-                word, _ = line.split('\t')
-                if word.isdigit():
-                    word = '<NUM>'
-                elif ('\u0041' <= word <='\u005a') or ('\u0061' <= word <='\u007a'):
-                    word = '<ENG>'
-                if word not in word2id:
-                    word2id[word] = [len(word2id)+2, 1]
-                else:
-                    word2id[word][1] += 1
+        try:
+            for line in lines:
+                line = line.strip()
+                if line is not '':
+                    word, _ = line.split('\t')
+                    if word.isdigit():
+                        word = '<NUM>'
+                    elif ('\u0041' <= word <='\u005a') or ('\u0061' <= word <='\u007a'):
+                        word = '<ENG>'
+                    if word not in word2id:
+                        word2id[word] = [len(word2id)+4, 1]
+                    else:
+                        word2id[word][1] += 1
+        except Exception as e:
+            print(e)
+            print('line is -------------->',line)
+            print('file is ===>',file)
+            sys.exit(1)
         print('done!-------->',corpus_path)
+
+
+    # 处理生僻字
     # low_freq_words = []
     # for word, [word_id, word_freq] in word2id.items():
     #     if word_freq < min_count and word != '<NUM>' and word != '<ENG>':
@@ -188,8 +203,8 @@ def vocab_build(corpus_dir, vocab_path, min_count):
     # for word in word2id.keys():
     #     word2id[word] = new_id
     #     new_id += 1
-    word2id['<UNK>'] = [1,0]
-    word2id['<PAD>'] = [0,0]
+
+
 
     print(len(word2id))
     with open(vocab_path, 'wb') as fw:
@@ -204,13 +219,14 @@ def BIOES_tag_trans(path,outputpath):
         f.write(newcontent)
 
 # 原计数词表转换为无计数词表
-def vocab_trans(oVocab_path,out_path):
-    with open(oVocab_path,'rb') as fr:
+def vocab_trans(vocab_path_c, out_path):
+    with open(vocab_path_c, 'rb') as fr:
         dict = pickle.load(fr)
     newdict = {k:v[0] for k,v in dict.items()}
     print(newdict)
     with open(out_path,'wb') as fw:
         pickle.dump(newdict,fw)
+    print('===done vocab_trans===')
 
 
 # BIO格式标注数据 转换为BIOES格式：
@@ -270,20 +286,10 @@ if __name__ == '__main__':
     #     outpath = os.path.join(outdir, file_name)
     #     text2BIOES(inputpath, outpath)
 
-    # dir = r'F:\zzd\毕业论文\论文代码\NER\data'
-    new_outpath = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab.pkl'
+    dir = r'F:\zzd\毕业论文\论文代码\NER\data'
+    vocab_path_c = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab_c.pkl'
     vocab_path = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab.pkl'
-    # with open(vocab_path,'rb') as f:
-    #     dict = pickle.load(f)
-    # newdict = {}
-    # newdict['<PAD>'] = 0
-    # newdict['<UNK>'] = 1
-    # for k,v in dict.items():
-    #     newdict[k] = v+1
-    # with open(new_outpath,'wb') as f:
-    #     pickle.dump(newdict,f)
-    # print('done')
-    with open(vocab_path,'rb') as f:
-        dict = pickle.load(f)
-    print('done')
+    vocab_build(dir,vocab_path_c)
+    vocab_trans(vocab_path_c,vocab_path)
+
 

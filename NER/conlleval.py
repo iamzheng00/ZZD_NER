@@ -179,8 +179,19 @@ def get_result(correct_chunks, true_chunks, pred_chunks,
     # compute overall precision, recall and FB1 (default values are 0.0)
     prec, rec, f1 = calc_metrics(sum_correct_chunks, sum_pred_chunks, sum_true_chunks)
     res = (prec, rec, f1)
+
+    # for each chunk type, compute precision, recall and FB1 (default values are 0.0)
+    label_dict = {}
+    for t in chunk_types:
+        prec_l, rec_l, f1_l = calc_metrics(correct_chunks[t], pred_chunks[t], true_chunks[t])
+        label_dict[t] = (prec_l, rec_l, f1_l)
+        if verbose:
+            print("%17s: " % t, end='')
+            print("precision: %6.2f%%; recall: %6.2f%%; FB1: %6.2f" %
+                  (prec_l, rec_l, f1_l), end='')
+            print("  %d" % pred_chunks[t])
     if not verbose:
-        return res
+        return res,label_dict
 
     # print overall performance, and performance per chunk type
     
@@ -191,15 +202,7 @@ def get_result(correct_chunks, true_chunks, pred_chunks,
     print("accuracy: %6.2f%%; " % (100*sum_correct_counts/sum_true_counts), end='')
     print("precision: %6.2f%%; recall: %6.2f%%; FB1: %6.2f" % (prec, rec, f1))
 
-    # for each chunk type, compute precision, recall and FB1 (default values are 0.0)
-    label_dict = {}
-    for t in chunk_types:
-        prec, rec, f1 = calc_metrics(correct_chunks[t], pred_chunks[t], true_chunks[t])
-        print("%17s: " %t , end='')
-        print("precision: %6.2f%%; recall: %6.2f%%; FB1: %6.2f" %
-                    (prec, rec, f1), end='')
-        print("  %d" % pred_chunks[t])
-        label_dict[t] = (prec,rec,f1)
+
 
     return res,label_dict
     # you can generate LaTeX output for tables like in

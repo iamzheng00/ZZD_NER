@@ -44,7 +44,7 @@ log_writer_test = tf.summary.create_file_writer(log_dir_test)
 
 # 获取数据
 train_data_dir = 'data_split/MSRA'
-batches = get_batches(train_data_dir, 10, configers.batchsize)
+batches = get_batches_v1(train_data_dir, 10, configers.batchsize)
 train_batches = batches[0:3]
 test_batch = batches[5]
 print('batches is ready!\n'
