@@ -18,15 +18,24 @@ for gpu in gpus:
 
 
 class conf():
-    LSTM_dim = 300
-    tag_num = 18
-    optimizer = tf.optimizers.Adam(learning_rate=0.005)
-    batchsize = 200
+    def __init__(self,choose_mod=None):
+        self.LSTM_dim = 300
+        self.tag_num = 18
+        self.optimizer = tf.optimizers.Adam(learning_rate=0.005)
+        self.batchsize = 200
+        if choose_mod == None:
+            self.mod = 'BiLSTM'
+        else:
+            self.mod = choose_mod
 
 
-class Model_bilstm(keras.Model):
+
+
+class Model_NER(keras.Model):
     def __init__(self, conf):
-        super(Model_bilstm, self).__init__()
+        super(Model_NER, self).__init__()
+        self.mod = conf.mod
+
         # 模型基本参数
         self.LSTM_dim = conf.LSTM_dim
         self.tag_num = conf.tag_num
@@ -41,12 +50,26 @@ class Model_bilstm(keras.Model):
             tf.keras.initializers.GlorotUniform()([self.tag_num, self.tag_num]), name="transition_matrix"
         )
 
+        self.conv1 = layers.Conv1D(self.LSTM_dim,3,padding='same',dilation_rate=1,activation='relu')
+        self.conv2 = layers.Conv1D(self.LSTM_dim,3,padding='same',dilation_rate=1,activation='relu')
+        self.conv3 = layers.Conv1D(self.LSTM_dim,3,padding='same',dilation_rate=2,activation='relu')
+
         self.optimizer = conf.optimizer
 
-    def call(self, inputs, training=None, mask=None):
+    def call(self, inputs,training=None, mask=None):
         x = self.embedding(inputs)
-        x = self.BiLSTM(x)
-        x = self.dense(x)
+        if self.mod == 'IDCNN':
+            conc_x = []
+            for i in range(4):
+                x = self.conv1(x)
+                x = self.conv2(x)
+                x = self.conv3(x)
+                conc_x.append(x)
+            x = tf.concat(conc_x,axis=3)
+            x = self.dense(x)
+        else:
+            x = self.BiLSTM(x)
+            x = self.dense(x)
         return x
 
     def crf_loss(self, input, tag_ids, sentence_len_list):
@@ -56,20 +79,17 @@ class Model_bilstm(keras.Model):
         loss = tf.reduce_mean(-likehood)
         return loss
 
-
     def predict_one_batch(self, test_batch):
         seq_ids_padded, tag_ids_padded, seq_len_list = get_train_data_from_batch(test_batch)
         logits = self(seq_ids_padded)
         loss = self.crf_loss(logits, tag_ids_padded, seq_len_list)
         pred_tags, pred_best_score = crf.crf_decode(potentials=logits, transition_params=self.trans_p,
-                                                        sequence_length=seq_len_list)
+                                                    sequence_length=seq_len_list)
         pred_tags_masked = seq_masking(pred_tags, seq_len_list)
-        return (loss, pred_tags_masked,tag_ids_padded)
+        return (loss, pred_tags_masked, tag_ids_padded)
 
-
-
-
-    def inner_train_one_step(self, batches, inner_epochNum, taskname=None, log_writer=None):
+    def inner_train_one_step(self, batches, inner_iters, inner_epochNum, outer_epochNum, task_name,
+                             log_writer):
         '''
         :param self:
         :param batches: one batch data: [[sentence],[sentence],....]
@@ -82,7 +102,6 @@ class Model_bilstm(keras.Model):
 
         # =====run model=======
         for batch_num in range(batch_size):
-
             batch = batches[batch_num]
             seq_ids_padded, tag_ids_padded, seq_len_list = get_train_data_from_batch(batch)
             with tf.GradientTape() as tape:
@@ -95,15 +114,14 @@ class Model_bilstm(keras.Model):
             # optimizer.minimize(loss, [myModel_bilstm.trainable_variables])
 
         pred_tags_masked = seq_masking(pred_tags, seq_len_list)
-        p_tags_char, p_tagsid_flatten = get_id2tag(pred_tags_masked, taskname)
-        t_tags_char, t_tagsid_flatten = get_id2tag(tag_ids_padded, taskname)
-        (P_t, R_t, F1_t),_ = evaluate(t_tags_char, p_tags_char, verbose=False)
+        p_tags_char, p_tagsid_flatten = get_id2tag(pred_tags_masked, taskname=task_name)
+        t_tags_char, t_tagsid_flatten = get_id2tag(tag_ids_padded, taskname=task_name)
+        (P_t, R_t, F1_t), _ = evaluate(t_tags_char, p_tags_char, verbose=False)
         with log_writer.as_default():
             step = batch_num + 1 + inner_epochNum * batch_size
-            tf.summary.scalar("loss", loss, step=inner_epochNum)
+            tf.summary.scalar("loss", loss, step=inner_epochNum + outer_epochNum * inner_iters)
             tf.summary.scalar("P", P_t, step=inner_epochNum)
             tf.summary.scalar("R", R_t, step=inner_epochNum)
             tf.summary.scalar("F", F1_t, step=inner_epochNum)
-
 
 # if __name__ == '__main__':

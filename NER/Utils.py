@@ -49,17 +49,17 @@ def maxlen(sentencs):
 
 
 # 读取BIOES数据，转换为模型所需的列表
-def read_train_data(traindata_path, vocab_path, taskname=''):
+def read_BIOES_data(BIOESdata_path, vocab_path, taskname=''):
     '''
     BIOES标注好的文本 读取后转换为模型所需列表
-    :param traindata_path: BIOES标注好的文本路径
+    :param BIOESdata_path: BIOES标注好的文本路径
     :param vocab_path: data=[[sentence],[sentence],....]
                      sentence=[[chars],[charids],[tags],[tag_ids]]
     :param taskname: 根据任务类别 只取数据中对应类别的标签，其他标签置为O
     :return:
     '''
     data = []
-    with io.open(traindata_path, encoding='utf-8') as fr:
+    with io.open(BIOESdata_path, encoding='utf-8') as fr:
         lines = fr.readlines()
     with open(vocab_path, 'rb') as f:
         char2id = pickle.load(f)
@@ -103,7 +103,7 @@ def read_train_data(traindata_path, vocab_path, taskname=''):
                 continue
             data.append((chars, charids, tags, tag_ids))
             chars, charids, tags, tag_ids = [], [], [], []
-    print('------>已读取数据源 {} ! 其中包含{}个句子'.format(traindata_path, len(data)))
+    print('------>已读取数据源 {} ! 其中包含{}个句子'.format(BIOESdata_path, len(data)))
     # print(data)
     return data
 
@@ -114,7 +114,7 @@ def data_to_batches(data, batch_size, batch_num):
              sentence=[[chars],[charids],[tags],[tag_ids]]
     :param batch_size:
     :return: [[one batch],[]...]
-            one batch: [[charids_list],[tagids_list]]
+            one batch: [[sentence],...,[sentence]]
     '''
     num_batches = len(data) // batch_size
     random.shuffle(data)
@@ -125,32 +125,27 @@ def data_to_batches(data, batch_size, batch_num):
 
 
 # 获得训练batches V1
-def get_batches_v1(train_data_dir, data_file_Num, batchsize):
+def get_batches_v1(train_data_path, batchsize,taskname=None):
     '''
     从data_split目录中选取 已划分为200句一个文件的训练数据
-    :param train_data_dir:
+    :param train_data_path:
     :param data_file_Num: 从源训练数据文件中读取的文件数量（读取的所有训练文件 制作为一个batches）
     :param batchsize:
     :return:
     '''
-    train_files = os.listdir(train_data_dir)
 
     # 准备数据
-    datas = []
     vocab_path = 'vocab/vocab.pkl'
-    for i in range(data_file_Num):
-        train_data_path = os.path.join(train_data_dir, train_files[i])
-        data = read_train_data(train_data_path, vocab_path)
-        datas.extend(data)
-    batch_num = len(datas) // batchsize
-    batches = data_to_batches(datas, batch_size=batchsize, batch_num=batch_num)
+    data = read_BIOES_data(train_data_path, vocab_path,taskname=taskname)
+    batch_num = len(data) // batchsize
+    batches = data_to_batches(data, batch_size=batchsize, batch_num=batch_num)
     return batches
 
 
 # 获得训练batches V2
 def get_batches_v2(train_data_path, batch_size, batch_num, taskname=None):
     vocab_path = 'vocab/vocab.pkl'
-    data = read_train_data(train_data_path, vocab_path, taskname)
+    data = read_BIOES_data(train_data_path, vocab_path, taskname=taskname)
     batches = data_to_batches(data, batch_size, batch_num)
     return batches
 

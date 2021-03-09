@@ -146,7 +146,7 @@ def train_one_epoch(mymodel,optimizer,batches, epoch_num=1, checkpoints_dir='che
 
 
 if __name__ == '__main__':
-    from Utils import read_train_data, get_batches_v1
+    from Utils import read_BIOES_data, get_batches_v1
 
     starttime = time.time()
     train_data_dir = r'F:\zzd\毕业论文\论文代码\NER\data_split\MSRA'
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     vocab_path = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab.pkl'
     for i in range(3):
         train_data_path = os.path.join(train_data_dir, train_files[i])
-        data = read_train_data(train_data_path, vocab_path)
+        data = read_BIOES_data(train_data_path, vocab_path)
         datas.extend(data)
     batches = get_batches_v1(datas, 200)
 
