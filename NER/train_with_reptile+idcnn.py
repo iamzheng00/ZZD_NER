@@ -15,12 +15,12 @@ gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 
-recordFileName = 'test_record01'
+recordFileName = 'record_reptile+idcnn_20i_0.1e'
 create_record_dirs(recordFileName)
 epochNum = get_epochNum(recordFileName)  # 获取当前记录的epoch数
 
 # 配置模型参数、检查点
-configers = conf()
+configers = conf(choose_mod='IDCNN')
 myModel = Model_NER(configers)
 ckpt_dir_inner = os.path.join(recordFileName, 'checkpoints')
 ckpt_dir_theta_0 = os.path.join(recordFileName, 'theta_0')

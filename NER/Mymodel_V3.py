@@ -23,6 +23,8 @@ class conf():
         self.tag_num = 18
         self.optimizer = tf.optimizers.Adam(learning_rate=0.005)
         self.batchsize = 200
+        self.embedding_in_dim = 10000
+        self.embedding_out_dim = 100
         if choose_mod == None:
             self.mod = 'BiLSTM'
         else:
@@ -32,7 +34,7 @@ class conf():
 
 
 class Model_NER(keras.Model):
-    def __init__(self, conf):
+    def __init__(self, conf:conf):
         super(Model_NER, self).__init__()
         self.mod = conf.mod
 
@@ -40,7 +42,7 @@ class Model_NER(keras.Model):
         self.LSTM_dim = conf.LSTM_dim
         self.tag_num = conf.tag_num
         # 模型所需的层定义
-        self.embedding = layers.Embedding(input_dim=10000, output_dim=100, mask_zero=True)
+        self.embedding = layers.Embedding(input_dim=conf.embedding_in_dim, output_dim=conf.embedding_out_dim, mask_zero=True)
 
         self.dense = layers.Dense(self.tag_num)
         self.fw_LSTM = layers.LSTM(units=self.LSTM_dim, return_sequences=True, go_backwards=False)
@@ -50,9 +52,9 @@ class Model_NER(keras.Model):
             tf.keras.initializers.GlorotUniform()([self.tag_num, self.tag_num]), name="transition_matrix"
         )
 
-        self.conv1 = layers.Conv1D(self.LSTM_dim,3,padding='same',dilation_rate=1,activation='relu')
-        self.conv2 = layers.Conv1D(self.LSTM_dim,3,padding='same',dilation_rate=1,activation='relu')
-        self.conv3 = layers.Conv1D(self.LSTM_dim,3,padding='same',dilation_rate=2,activation='relu')
+        self.conv1 = layers.Conv1D(conf.embedding_out_dim,3,padding='same',dilation_rate=1,activation='relu')
+        self.conv2 = layers.Conv1D(conf.embedding_out_dim,3,padding='same',dilation_rate=1,activation='relu')
+        self.conv3 = layers.Conv1D(conf.embedding_out_dim,3,padding='same',dilation_rate=2,activation='relu')
 
         self.optimizer = conf.optimizer
 
@@ -65,7 +67,7 @@ class Model_NER(keras.Model):
                 x = self.conv2(x)
                 x = self.conv3(x)
                 conc_x.append(x)
-            x = tf.concat(conc_x,axis=3)
+            x = tf.concat(conc_x,axis=2)
             x = self.dense(x)
         else:
             x = self.BiLSTM(x)
@@ -123,5 +125,6 @@ class Model_NER(keras.Model):
             tf.summary.scalar("P", P_t, step=inner_epochNum)
             tf.summary.scalar("R", R_t, step=inner_epochNum)
             tf.summary.scalar("F", F1_t, step=inner_epochNum)
+        return (loss,P_t)
 
 # if __name__ == '__main__':

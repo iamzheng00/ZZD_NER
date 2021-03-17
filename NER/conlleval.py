@@ -197,8 +197,10 @@ def get_result(correct_chunks, true_chunks, pred_chunks,
     
     print("processed %i tokens with %i phrases; " % (sum_true_counts, sum_true_chunks), end='')
     print("found: %i phrases; correct: %i.\n" % (sum_pred_chunks, sum_correct_chunks), end='')
-        
-    print("accuracy: %6.2f%%; (non-O)" % (100*nonO_correct_counts/nonO_true_counts))
+    if nonO_true_counts==0:
+        print("accuracy: %6.2f%%; (non-O)" % (-nonO_correct_counts))
+    else:
+        print("accuracy: %6.2f%%; (non-O)" % (100*nonO_correct_counts/nonO_true_counts))
     print("accuracy: %6.2f%%; " % (100*sum_correct_counts/sum_true_counts), end='')
     print("precision: %6.2f%%; recall: %6.2f%%; FB1: %6.2f" % (prec, rec, f1))
 

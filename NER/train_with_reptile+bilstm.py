@@ -50,7 +50,7 @@ print('batches is ready!\n'
 
 train_tasks = ['address', 'scene', 'government', 'organization',
                'position', 'name', 'book', 'movie']
-validation_tasks = ['game', 'company']
+validation_tasks = ['game', 'company',]
 
 inner_iters = 20
 e = 0.1
@@ -70,9 +70,10 @@ for epoch in range(epochNum, epochNum + 1000):
         batches = get_batches_v2(train_data_path, batch_size=200, batch_num=3, taskname=task)
         with tqdm(total=inner_iters) as bar:
             for i in range(inner_iters):
-                myModel.inner_train_one_step(batches, inner_iters, i, epochNum,
+                train_loss,train_P = myModel.inner_train_one_step(batches, inner_iters, i, epochNum,
                                              task_name=task, log_writer=log_writer_train)
                 bar.update(1)
+            print('train_loss:{}   train_Precision:{}'.format(train_loss,train_P))
 
         myModel.save_weights(ckpt_dir_inner + '/ckpt_' + task)
         vars_list.append(myModel.get_weights())

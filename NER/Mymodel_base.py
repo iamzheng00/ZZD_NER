@@ -20,8 +20,8 @@ for gpu in gpus:
 class conf():
     def __init__(self, choose_mod=None):
         self.LSTM_dim = 300
-        self.tag_num = 18
-        self.optimizer = tf.optimizers.Adam(learning_rate=0.005)
+        self.tag_num = 42
+        self.optimizer = tf.optimizers.Adam(learning_rate=0.001)
         self.batchsize = 200
         if choose_mod == None:
             self.mod = 'BiLSTM'

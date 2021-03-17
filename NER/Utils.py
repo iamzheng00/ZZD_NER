@@ -14,7 +14,18 @@ tag2id_v0 = {'<pad>': 0,
              'S-Loc': 10, 'B-Loc': 11, 'I-Loc': 12, 'E-Loc': 13,
              'S-Time': 14, 'B-Time': 15, 'I-Time': 16, 'E-Time': 17,
              }
-
+tag2id_CLUE = {'<pad>': 0,
+               'O': 1,
+               'S-address': 2, 'B-address': 3, 'I-address': 4, 'E-address': 5,
+               'S-scene': 6, 'B-scene': 7, 'I-scene': 8, 'E-scene': 9,
+               'S-government': 10, 'B-government': 11, 'I-government': 12, 'E-government': 13,
+               'S-organization': 14, 'B-organization': 15, 'I-organization': 16, 'E-organization': 17,
+               'S-company': 18, 'B-company': 19, 'I-company': 20, 'E-company': 21,
+               'S-position': 22, 'B-position': 23, 'I-position': 24, 'E-position': 25,
+               'S-name': 26, 'B-name': 27, 'I-name': 28, 'E-name': 29,
+               'S-game': 30, 'B-game': 31, 'I-game': 32, 'E-game': 33,
+               'S-book': 34, 'B-book': 35, 'I-book': 36, 'E-book': 37,
+               'S-movie': 38, 'B-movie': 39, 'I-movie': 40, 'E-movie': 41, }
 
 RMRB_tag = {
     "nr": "Person",
@@ -88,6 +99,11 @@ def read_BIOES_data(BIOESdata_path, vocab_path, taskname=''):
                     tags.append(tag)
                     tag_id = tag2id_v0[tag]
                     tag_ids.append(tag_id)
+                elif taskname == 'CLUE_ALL':
+                    tag = ''.join(line).strip().split()[1]
+                    tags.append(tag)
+                    tag_id = tag2id_CLUE[tag]
+                    tag_ids.append(tag_id)
                 else:
                     tag = ''.join(line).strip().split()[1]
                     tags.append(tag)
@@ -107,6 +123,7 @@ def read_BIOES_data(BIOESdata_path, vocab_path, taskname=''):
     # print(data)
     return data
 
+
 # 原始data转换成batches
 def data_to_batches(data, batch_size, batch_num):
     '''
@@ -125,7 +142,7 @@ def data_to_batches(data, batch_size, batch_num):
 
 
 # 获得训练batches V1
-def get_batches_v1(train_data_path, batchsize,taskname=None):
+def get_batches_v1(train_data_path, batchsize, taskname=''):
     '''
     从data_split目录中选取 已划分为200句一个文件的训练数据
     :param train_data_path:
@@ -136,14 +153,14 @@ def get_batches_v1(train_data_path, batchsize,taskname=None):
 
     # 准备数据
     vocab_path = 'vocab/vocab.pkl'
-    data = read_BIOES_data(train_data_path, vocab_path,taskname=taskname)
+    data = read_BIOES_data(train_data_path, vocab_path, taskname=taskname)
     batch_num = len(data) // batchsize
     batches = data_to_batches(data, batch_size=batchsize, batch_num=batch_num)
     return batches
 
 
 # 获得训练batches V2
-def get_batches_v2(train_data_path, batch_size, batch_num, taskname=None):
+def get_batches_v2(train_data_path, batch_size, batch_num, taskname=''):
     vocab_path = 'vocab/vocab.pkl'
     data = read_BIOES_data(train_data_path, vocab_path, taskname=taskname)
     batches = data_to_batches(data, batch_size, batch_num)
@@ -236,8 +253,10 @@ def get_id2tag(tag_list, taskname=''):
     }
 
     tag_list_flatten = np.array(tag_list).flatten()
-    if taskname=='':
+    if taskname == '':
         id2tag = {tag2id_v0[k]: k for k in tag2id_v0.keys()}
+    elif taskname == 'CLUE_ALL':
+        id2tag = {tag2id_CLUE[k]: k for k in tag2id_CLUE.keys()}
     else:
         id2tag = {tag2id[k]: k for k in tag2id.keys()}
     newtag_list = []
@@ -356,8 +375,9 @@ def update_vars(myModel, vars_list, epsilon):
     newvar = [v2 + epsilon * (v1 - v2) for v1, v2 in zip(t_var, oldvar)]
     myModel.set_weights(newvar)
 
+
 if __name__ == '__main__':
     path = r'F:\zzd\毕业论文\论文代码\NER\data_tasks\address'
     vocabpath = r'F:\zzd\毕业论文\论文代码\NER\vocab\vocab.pkl'
-    batches = get_batches_v2(path,batch_size=200,batch_num=3,taskname='address')
+    batches = get_batches_v2(path, batch_size=200, batch_num=3, taskname='address')
     batches = 1
