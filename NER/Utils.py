@@ -60,7 +60,7 @@ def maxlen(sentencs):
 
 
 # 读取BIOES数据，转换为模型所需的列表
-def read_BIOES_data(BIOESdata_path, vocab_path, taskname=''):
+def read_BIOES_data(BIOESdata_path, vocab_path, taskname):
     '''
     BIOES标注好的文本 读取后转换为模型所需列表
     :param BIOESdata_path: BIOES标注好的文本路径
@@ -74,12 +74,20 @@ def read_BIOES_data(BIOESdata_path, vocab_path, taskname=''):
         lines = fr.readlines()
     with open(vocab_path, 'rb') as f:
         char2id = pickle.load(f)
-
-    tag2id = {
-        '<pad>': 0,
-        'O': 1,
-        'S-' + taskname: 2, 'B-' + taskname: 3, 'I-' + taskname: 4, 'E-' + taskname: 5,
-    }
+    if type(taskname) is str:
+        tag2id = {
+            '<pad>': 0,
+            'O': 1,
+            'S-' + taskname: 2, 'B-' + taskname: 3, 'I-' + taskname: 4, 'E-' + taskname: 5,
+        }
+    elif type(taskname) is list:
+        tag2id = {
+            '<pad>': 0,
+            'O': 1}
+        for i,name in enumerate(taskname):
+            tag2id.update({'S-' + name: i*4+2, 'B-' + name: i*4+3, 'I-' + name: i*4+4, 'E-' + name: i*4+5,})
+    else:
+        raise TypeError('the arg:taskname must be a list or str!')
     chars, charids, tags, tag_ids = [], [], [], []
     for line in lines:
         if line != '\n':
@@ -136,8 +144,12 @@ def data_to_batches(data, batch_size, batch_num):
     num_batches = len(data) // batch_size
     random.shuffle(data)
     batches = []
-    for i in range(batch_num):
-        batches.append(data[i * batch_size:(i + 1) * batch_size])
+    if batch_num <= num_batches:
+        for i in range(batch_num):
+            batches.append(data[i * batch_size:(i + 1) * batch_size])
+    else:
+        for i in range(num_batches):
+            batches.append(data[i * batch_size:(i + 1) * batch_size])
     return batches
 
 
@@ -164,6 +176,16 @@ def get_batches_v2(train_data_path, batch_size, batch_num, taskname=''):
     vocab_path = 'vocab/vocab.pkl'
     data = read_BIOES_data(train_data_path, vocab_path, taskname=taskname)
     batches = data_to_batches(data, batch_size, batch_num)
+    return batches
+
+# 获得训练batches 包含tasks中的所有标签 V3
+def get_batches_v3(train_data_path_list:list, batch_size, batch_num, taskname=''):
+    vocab_path = 'vocab/vocab.pkl'
+    batches = []
+    for train_data_path in train_data_path_list:
+        data = read_BIOES_data(train_data_path, vocab_path, taskname=taskname)
+        batches.extend(data_to_batches(data, batch_size, batch_num))
+    random.shuffle(batches)
     return batches
 
 
@@ -239,18 +261,27 @@ def findall_tag(tag_ids, seq_len_list):
 
 
 # 解析标签id-->输出一个flatten列表
-def get_id2tag(tag_list, taskname=''):
+def get_id2tag(tag_list, taskname):
     '''
 
     :param tag_list:  [batchsize, seq_length]
     :return: 一维list
     '''
 
-    tag2id = {
-        '<pad>': 0,
-        'O': 1,
-        'S-' + taskname: 2, 'B-' + taskname: 3, 'I-' + taskname: 4, 'E-' + taskname: 5,
-    }
+    if type(taskname) is str:
+        tag2id = {
+            '<pad>': 0,
+            'O': 1,
+            'S-' + taskname: 2, 'B-' + taskname: 3, 'I-' + taskname: 4, 'E-' + taskname: 5,
+        }
+    elif type(taskname) is list:
+        tag2id = {
+            '<pad>': 0,
+            'O': 1}
+        for i,name in enumerate(taskname):
+            tag2id.update({'S-' + name: i*4+2, 'B-' + name: i*4+3, 'I-' + name: i*4+4, 'E-' + name: i*4+5,})
+    else:
+        raise TypeError('the arg:taskname must be a list or str!')
 
     tag_list_flatten = np.array(tag_list).flatten()
     if taskname == '':

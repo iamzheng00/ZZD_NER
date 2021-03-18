@@ -100,10 +100,10 @@ class Model_NER(keras.Model):
         :return:
         '''
 
-        batch_size = len(batches)
+        batches_len = len(batches)
 
         # =====run model=======
-        for batch_num in range(batch_size):
+        for batch_num in range(batches_len):
             batch = batches[batch_num]
             seq_ids_padded, tag_ids_padded, seq_len_list = get_train_data_from_batch(batch)
             with tf.GradientTape() as tape:
@@ -120,7 +120,7 @@ class Model_NER(keras.Model):
         t_tags_char, t_tagsid_flatten = get_id2tag(tag_ids_padded, taskname=task_name)
         (P_t, R_t, F1_t), _ = evaluate(t_tags_char, p_tags_char, verbose=False)
         with log_writer.as_default():
-            step = batch_num + 1 + inner_epochNum * batch_size
+            step = batch_num + 1 + inner_epochNum * batches_len
             tf.summary.scalar("loss", loss, step=inner_epochNum + outer_epochNum * inner_iters)
             tf.summary.scalar("P", P_t, step=inner_epochNum)
             tf.summary.scalar("R", R_t, step=inner_epochNum)

@@ -45,7 +45,7 @@ log_writer_train = tf.summary.create_file_writer(log_dir_train)
 log_writer_vali_train = tf.summary.create_file_writer(log_dir_vali_train)
 log_writer_vali_test = tf.summary.create_file_writer(log_dir_vali_test)
 
-print('batches is ready!\n'
+print('record files is created!\n'
       '-----------------------------------------------------------\n')
 
 train_tasks = ['address', 'scene', 'government', 'organization',

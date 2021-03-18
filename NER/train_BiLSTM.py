@@ -1,5 +1,5 @@
 import datetime
-from Mymodel_base import Model_NER,conf
+from Mymodel_V3 import Model_NER,conf
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -15,13 +15,30 @@ gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 
-tasks = [ 'scene', 'government', 'organization',
-               'position', 'name', 'book', 'movie','game', 'company']
-train_batch_num = 50
+train_tasks = ['address', 'scene', 'government', 'organization',
+               'company', 'name', 'book']
+# 训练集采集
+task_samples = random.sample(train_tasks, 3)
+task_samples.sort()
+task_names = '-'.join(task_samples)
+train_data_path_list = []
+for t in task_samples:
+    p = os.path.join('data_tasks', t)
+    train_data_path_list.append(p)
 
-# for task in tasks:
+train_batch_num = 1
+vocab_path = 'vocab/vocab.pkl'
+train_batches = get_batches_v3(train_data_path_list,200, batch_num=train_batch_num, taskname=task_samples)
+# 获取验证集数据： 验证集分两部分，验证_训练集 和 验证_测试集
+vali_train_data_paths = []
+vali_test_data_path = ['data/CLUE_BIOES_dev']
+vali_test_batches = get_batches_v3(train_data_path_list=vali_test_data_path, batch_size=200, batch_num=1,
+                                    taskname=task_samples)
+print('batches is ready!\n'
+      '-----------------------------------------------------------\n')
+
 task = 'CLUE_ALL'
-recordFileName = 'record_bilstm_' + str(train_batch_num) + 'b-' + task
+recordFileName = 'record_bilstm_' + str(train_batch_num*3) + 'b-' + task_names
 create_record_dirs(recordFileName)
 epochNum = get_epochNum(recordFileName)  # 获取当前记录的epoch数
 
@@ -41,38 +58,25 @@ if epochNum != 0:
 # 配置tensorboard
 # log_dir_train = recordFileName + '/tensorboard/' + datetime.datetime.now().strftime("%Y%m%d-%H%M") + '-train'
 # log_dir_train = recordFileName + '/tensorboard/' + '-train'
-log_dir_train = r'F:\zzd\毕业论文\论文代码\NER\test_record_bilstm\tensorboard\-train'
+log_dir_train = recordFileName + '/tensorboard/' + '-train'
 log_dir_test = recordFileName + '/tensorboard/' + '-test'
 log_writer_train = tf.summary.create_file_writer(log_dir_train)
 log_writer_test = tf.summary.create_file_writer(log_dir_test)
 
-# 获取数据
-
-train_data_path = 'data/CLUE_BIOES_train'
-test_data_path = 'data/CLUE_BIOES_dev'
-vocab_path = 'vocab/vocab.pkl'
-train_batches = get_batches_v1(train_data_path,200, taskname=task)
-train_batches=train_batches[0:train_batch_num]
-test_batches = get_batches_v1(test_data_path,200, taskname=task)
-test_batch=[]
-for a in test_batches:
-    test_batch.extend(a)
-print('batches is ready!\n'
-      '-----------------------------------------------------------\n')
 
 
-for epoch in range(epochNum, epochNum + 200):
+for epoch in range(epochNum, epochNum + 300):
     starttime = time.time()
-    myModel_instance.inner_train_one_step(train_batches, epochNum=epoch, task_name=task, log_writer=log_writer_train, log_dir=log_dir_train)
+    myModel_instance.inner_train_one_step(train_batches, inner_iters=0,inner_epochNum=epoch,outer_epochNum=0, task_name=task_samples, log_writer=log_writer_train)
     endtime = time.time()
-    print('\ndone epoch:{}!——————run time ：'.format(epoch), str(endtime - starttime), 's.')
+    print('\ndone epoch:{}!  task:{}——————run time ：'.format(epoch, task_samples), str(endtime - starttime), 's.')
     print('===============================================================================\n')
     ckpt_manager.save(checkpoint_number=epoch)
 
     # test_batch = random.choice(test_batches)
-    test_loss, pred_tags_masked, tag_ids_padded = myModel_instance.predict_one_batch(test_batch)
-    p_tags_char, _ = get_id2tag(pred_tags_masked,taskname=task)
-    t_tags_char, _ = get_id2tag(tag_ids_padded,taskname=task)
+    test_loss, pred_tags_masked, tag_ids_padded = myModel_instance.predict_one_batch(vali_test_batches[0])
+    p_tags_char, _ = get_id2tag(pred_tags_masked,taskname=task_samples)
+    t_tags_char, _ = get_id2tag(tag_ids_padded,taskname=task_samples)
     (P, R, F1),label_result = evaluate(t_tags_char, p_tags_char, verbose=True)
     write_to_log(test_loss,P,R,F1,label_result,log_writer_test,epoch)
 
