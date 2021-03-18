@@ -90,7 +90,7 @@ class Model_NER(keras.Model):
         pred_tags_masked = seq_masking(pred_tags, seq_len_list)
         return (loss, pred_tags_masked, tag_ids_padded)
 
-    def inner_train_one_step(self, batches, inner_iters, inner_epochNum, outer_epochNum, task_name,
+    def inner_train_one_step(self,batches, inner_iters, inner_epochNum, outer_epochNum, task_name,
                              log_writer):
         '''
         :param self:

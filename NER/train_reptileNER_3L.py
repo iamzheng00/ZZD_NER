@@ -30,15 +30,15 @@ myModel = Model_NER(configers)
 ckpt_dir_inner = os.path.join(recordFileName, 'checkpoints')
 ckpt_dir_theta_0 = os.path.join(recordFileName, 'theta_0')
 ckpt_path_theta_0 = os.path.join(ckpt_dir_theta_0, 'ckpt_theta_0')
-ckpt_dir_theta_t = os.path.join(recordFileName, 'theta_t')
-ckpt_path_theta_t = os.path.join(ckpt_dir_theta_t, 'ckpt_theta_t')
+# ckpt_dir_theta_t = os.path.join(recordFileName, 'theta_t')
+# ckpt_path_theta_t = os.path.join(ckpt_dir_theta_t, 'ckpt_theta_t')
 checkpoint = tf.train.Checkpoint(optimizer=myModel.optimizer, model=myModel)
 ckpt_manager = tf.train.CheckpointManager(checkpoint, directory=ckpt_dir_inner, max_to_keep=5)
 
 if epochNum == 0:
     myModel.save_weights(ckpt_path_theta_0)
 else:
-    myModel.load_weights(ckpt_path_theta_t)
+    myModel.load_weights(ckpt_path_theta_0)
 
 # 配置tensorboard
 # log_dir_train = recordFileName + '/tensorboard/' + datetime.datetime.now().strftime("%Y%m%d-%H%M") + '-train'
@@ -68,11 +68,12 @@ vali_test_batches = get_batches_v3(train_data_path_list=vali_test_data_path, bat
                                     taskname=validation_tasks)
 
 for epoch in range(epochNum, epochNum + 500):
-    meta_step_size = epochNum / (epochNum + 500) * e + (1 - epochNum / (epochNum + 500)) * e_final
+    meta_step_size = epoch / (epochNum + 500) * e + (1 - epoch / (epochNum + 500)) * e_final
     starttime = time.time()
     print('====outer epoch:{}==========================================='.format(epoch))
     vars_list = []
-
+    myModel.load_weights(ckpt_path_theta_0)
+    # ==========对每个任务进行训练=============
     for task_N in range(5):
         # 任务采样，获取训练数据文件地址
         task_samples = random.sample(train_tasks, 3)
@@ -85,27 +86,32 @@ for epoch in range(epochNum, epochNum + 500):
 
         print('task{}:{},{},{}================'.format(task_N, task_samples[0], task_samples[1], task_samples[2]))
         # NER模型载入参数
-        if epoch == 0:
-            myModel.load_weights(ckpt_path_theta_0)
-        else:
-            myModel.load_weights(ckpt_path_theta_t)
+        # if epoch == 0:
+        #     myModel.load_weights(ckpt_path_theta_0)
+        # else:
+        #     myModel.load_weights(ckpt_path_theta_t)
+        myModel.optimizer = tf.optimizers.Adam(learning_rate=0.001)
 
-        # 内循环训练阶段
+        # ==============内循环训练阶段===================
         batches = get_batches_v3(train_data_path_list=path_list, batch_size=200, batch_num=1, taskname=task_samples)
         with tqdm(total=inner_iters) as bar:
             for i in range(inner_iters):
-                train_loss, train_P = myModel.inner_train_one_step(batches, inner_iters, i, epochNum,
+                train_loss, train_P = myModel.inner_train_one_step(batches, inner_iters, i, epoch,
                                                                    task_name=task_samples, log_writer=log_writer_train)
                 bar.update(1)
             print('train_loss:{}   train_Precision:{}'.format(train_loss, train_P))
 
+        # 记录当前任务训练所得model的参数
         task_names = '-'.join(task_samples)
         myModel.save_weights(ckpt_dir_inner + '/ckpt_' + task_names)
         vars_list.append(myModel.get_weights())
+        # 重置model参数为初始值
+        myModel.load_weights(ckpt_path_theta_0)
 
-    # 更新模型初始化参数
+    # 更新模型初始化参数theta_0
     update_vars(myModel, vars_list, e)
-    myModel.save_weights(ckpt_path_theta_t)
+    myModel.save_weights(ckpt_path_theta_0)
+
 
     # vali_data_path = 'data_tasks/' + vali_sample
     # vali_train_batches = get_batches_v2(vali_data_path, batch_size=200, batch_num=3, taskname=vali_sample)
@@ -113,7 +119,7 @@ for epoch in range(epochNum, epochNum + 500):
     # 验证阶段训练NER模型
     with tqdm(total=inner_iters) as bar:
         for i in range(inner_iters):
-            myModel.inner_train_one_step(vali_train_batches, inner_iters=inner_iters, inner_epochNum=i, outer_epochNum=epochNum,
+            myModel.inner_train_one_step(vali_train_batches, inner_iters=inner_iters, inner_epochNum=i, outer_epochNum=epoch,
                                          task_name=validation_tasks, log_writer=log_writer_vali_train)
             bar.update(1)
     # 在新数据上测试效果
@@ -127,7 +133,7 @@ for epoch in range(epochNum, epochNum + 500):
     p_tags_char, _ = get_id2tag(pred_tags_masked, taskname=validation_tasks)
     t_tags_char, _ = get_id2tag(tag_ids_padded, taskname=validation_tasks)
     (P, R, F1), label_result = evaluate(t_tags_char, p_tags_char, verbose=True)
-    write_to_log(test_loss, P, R, F1, label_result, log_writer_vali_test, epochNum)
+    write_to_log(test_loss, P, R, F1, label_result, log_writer_vali_test, epoch)
 
     # 记录epoch
     Record_epoch_num(recordFileName, epoch)
