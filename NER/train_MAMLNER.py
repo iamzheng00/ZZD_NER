@@ -16,12 +16,11 @@ for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 
 mod = 'BiLSTM'
-inner_iters = 15
-e = 0.2
+inner_iters = 8
+e = 0.005
 e_final = 0.001
 batch_size = 200
-
-recordFileName = '_'.join(['record_3L_reptile+' + mod, str(inner_iters) + 'i', str(e) + 'e',str(batch_size)+'bs'])
+recordFileName = '_'.join(['test_3L_MAML+' + mod, str(inner_iters) + 'i', str(e)+'-' + str(e_final) + 'e',str(batch_size)+'bs'])
 create_record_dirs(recordFileName)
 epochNum = get_epochNum(recordFileName)  # 获取当前记录的epoch数
 
@@ -62,8 +61,7 @@ vali_train_data_paths = []
 for t in validation_tasks:
     temp = os.path.join('data_tasks', t)
     vali_train_data_paths.append(temp)
-vali_train_batches = get_batches_v3(train_data_path_list=vali_train_data_paths, batch_size=batch_size, batch_num=1,
-                                    taskname=validation_tasks)
+
 vali_test_data_path = 'data/CLUE_BIOES_dev'
 vali_test_batches = get_batches_v1(train_data_path=vali_test_data_path, batchsize=200,
                                     taskname=validation_tasks)
@@ -71,10 +69,8 @@ vali_test_batch = []
 for a in vali_test_batches:
     vali_test_batch.extend(a)
 
-
 for epoch in range(epochNum, 1000):
-    # meta_step_size = epoch / 1000 * e_final + (1 - epoch / 1000) * e
-    meta_step_size = epoch / 1000 * e_final + (1 - epoch / 1000) * 0.05
+    meta_step_size = epoch / 1000 * e_final + (1 - epoch / 1000) * e
     starttime = time.time()
     print('====outer epoch:{}==========================================='.format(epoch))
     vars_list = []
@@ -96,10 +92,10 @@ for epoch in range(epochNum, 1000):
         #     myModel.load_weights(ckpt_path_theta_0)
         # else:
         #     myModel.load_weights(ckpt_path_theta_t)
-        myModel.optimizer = tf.optimizers.Adam(learning_rate=0.0005)
+        myModel.optimizer = tf.optimizers.Adam(learning_rate=0.005)
 
         # ==============内循环训练阶段===================
-        batches = get_batches_v3(train_data_path_list=path_list, batch_size=200, batch_num=1, taskname=task_samples)
+        batches = get_batches_v3(train_data_path_list=path_list, batch_size=batch_size, batch_num=1, taskname=task_samples)
         with tqdm(total=inner_iters) as bar:
             for i in range(inner_iters):
                 train_loss, train_P = myModel.inner_train_one_step(batches, inner_iters, i, epoch,
@@ -109,21 +105,22 @@ for epoch in range(epochNum, 1000):
 
         # 记录当前任务训练所得model的参数
         task_names = '-'.join(task_samples)
-        myModel.save_weights(ckpt_dir_inner + '/ckpt_' + task_names)
+        # myModel.save_weights(ckpt_dir_inner + '/ckpt_' + task_names)
         vars_list.append(myModel.get_weights())
         # 重置model参数为初始值
         myModel.load_weights(ckpt_path_theta_0)
 
-    # 更新模型初始化参数theta_0
+    # TODO: 按MAML方式 求二次梯度 更新模型初始化参数theta_0
     update_vars(myModel, vars_list, e)
     myModel.save_weights(ckpt_path_theta_0)
-
 
     # vali_data_path = 'data_tasks/' + vali_sample
     # vali_train_batches = get_batches_v2(vali_data_path, batch_size=200, batch_num=3, taskname=vali_sample)
 
-    # 验证阶段训练NER模型
-    myModel.optimizer = tf.optimizers.Adam(learning_rate=0.001)
+    # ===========验证阶段训练NER模型=============
+    vali_train_batches = get_batches_v3(train_data_path_list=vali_train_data_paths, batch_size=batch_size, batch_num=1,
+                                        taskname=validation_tasks)
+    myModel.optimizer = tf.optimizers.Adam(learning_rate=0.005)
     with tqdm(total=inner_iters) as bar:
         for i in range(inner_iters):
             myModel.inner_train_one_step(vali_train_batches, inner_iters=inner_iters, inner_epochNum=i, outer_epochNum=epoch,
@@ -134,7 +131,6 @@ for epoch in range(epochNum, 1000):
           '**********************************************\n'.format(validation_tasks))
 
     # 验证阶段 测试NER模型
-
     test_loss, pred_tags_masked, tag_ids_padded = myModel.predict_one_batch(vali_test_batch)
     p_tags_char, _ = get_id2tag(pred_tags_masked, taskname=validation_tasks)
     t_tags_char, _ = get_id2tag(tag_ids_padded, taskname=validation_tasks)

@@ -8,24 +8,28 @@ import tensorflow as tf
 import tensorflow.keras as keras
 
 tag2id_v0 = {'<pad>': 0,
-             'O': 1,
-             'S-Person': 2, 'B-Person': 3, 'I-Person': 4, 'E-Person': 5,
-             'S-Org': 6, 'B-Org': 7, 'I-Org': 8, 'E-Org': 9,
-             'S-Loc': 10, 'B-Loc': 11, 'I-Loc': 12, 'E-Loc': 13,
-             'S-Time': 14, 'B-Time': 15, 'I-Time': 16, 'E-Time': 17,
+             'S-[CLS]': 1,
+             'S-[SEP]': 2,
+             'O': 3,
+             'S-Person': 4, 'B-Person': 5, 'I-Person': 6, 'E-Person': 7,
+             'S-Org': 8, 'B-Org': 9, 'I-Org': 10, 'E-Org': 11,
+             'S-Loc': 12, 'B-Loc': 13, 'I-Loc': 14, 'E-Loc': 15,
+             'S-Time': 16, 'B-Time': 17, 'I-Time': 18, 'E-Time': 19,
              }
 tag2id_CLUE = {'<pad>': 0,
-               'O': 1,
-               'S-address': 2, 'B-address': 3, 'I-address': 4, 'E-address': 5,
-               'S-scene': 6, 'B-scene': 7, 'I-scene': 8, 'E-scene': 9,
-               'S-government': 10, 'B-government': 11, 'I-government': 12, 'E-government': 13,
-               'S-organization': 14, 'B-organization': 15, 'I-organization': 16, 'E-organization': 17,
-               'S-company': 18, 'B-company': 19, 'I-company': 20, 'E-company': 21,
-               'S-position': 22, 'B-position': 23, 'I-position': 24, 'E-position': 25,
-               'S-name': 26, 'B-name': 27, 'I-name': 28, 'E-name': 29,
-               'S-game': 30, 'B-game': 31, 'I-game': 32, 'E-game': 33,
-               'S-book': 34, 'B-book': 35, 'I-book': 36, 'E-book': 37,
-               'S-movie': 38, 'B-movie': 39, 'I-movie': 40, 'E-movie': 41, }
+               'S-[CLS]': 1,
+               'S-[SEP]': 2,
+               'O': 3,
+               'S-address': 4, 'B-address': 5, 'I-address': 6, 'E-address': 7,
+               'S-scene': 8, 'B-scene': 9, 'I-scene': 10, 'E-scene': 11,
+               'S-government': 12, 'B-government': 13, 'I-government': 14, 'E-government': 15,
+               'S-organization': 16, 'B-organization': 17, 'I-organization': 18, 'E-organization': 19,
+               'S-company': 20, 'B-company': 21, 'I-company': 22, 'E-company': 23,
+               'S-position': 24, 'B-position': 25, 'I-position': 26, 'E-position': 27,
+               'S-name': 28, 'B-name': 29, 'I-name': 30, 'E-name': 31,
+               'S-game': 32, 'B-game': 33, 'I-game': 34, 'E-game': 35,
+               'S-book': 36, 'B-book': 37, 'I-book': 38, 'E-book': 39,
+               'S-movie': 40, 'B-movie': 41, 'I-movie': 42, 'E-movie': 43, }
 
 RMRB_tag = {
     "nr": "Person",
@@ -34,6 +38,25 @@ RMRB_tag = {
     "t": "Time"
 }
 
+def get_tag2id(taskname):
+    if type(taskname) is str:
+        tag2id = {'<pad>': 0,
+                  'S-[CLS]': 1,
+                  'S-[SEP]': 2,
+                  'O': 3,
+                  'S-' + taskname: 4, 'B-' + taskname: 5, 'I-' + taskname: 6, 'E-' + taskname: 7,
+                  }
+    elif type(taskname) is list:
+        tag2id = {'<pad>': 0,
+                  'S-[CLS]': 1,
+                  'S-[SEP]': 2,
+                  'O': 3}
+        for i, name in enumerate(taskname):
+            tag2id.update(
+                {'S-' + name: i * 4 + 4, 'B-' + name: i * 4 + 5, 'I-' + name: i * 4 + 6, 'E-' + name: i * 4 + 7, })
+    else:
+        raise TypeError('the arg:taskname must be a list or str!')
+    return tag2id
 
 # 读取词表 返回字典（字->id）
 def read_vocab(vocab_path):
@@ -53,7 +76,7 @@ def maxlen(sentencs):
     '''
 
     :param data: sentencs=[[sentence],[sentence],....]
-             sentence=[[char1],[char2],...[charn]]
+
     :return:
     '''
     return max([len(s) for s in sentencs])
@@ -74,20 +97,8 @@ def read_BIOES_data(BIOESdata_path, vocab_path, taskname):
         lines = fr.readlines()
     with open(vocab_path, 'rb') as f:
         char2id = pickle.load(f)
-    if type(taskname) is str:
-        tag2id = {
-            '<pad>': 0,
-            'O': 1,
-            'S-' + taskname: 2, 'B-' + taskname: 3, 'I-' + taskname: 4, 'E-' + taskname: 5,
-        }
-    elif type(taskname) is list:
-        tag2id = {
-            '<pad>': 0,
-            'O': 1}
-        for i,name in enumerate(taskname):
-            tag2id.update({'S-' + name: i*4+2, 'B-' + name: i*4+3, 'I-' + name: i*4+4, 'E-' + name: i*4+5,})
-    else:
-        raise TypeError('the arg:taskname must be a list or str!')
+    tag2id = get_tag2id(taskname)
+
     chars, charids, tags, tag_ids = [], [], [], []
     for line in lines:
         if line != '\n':
@@ -132,6 +143,57 @@ def read_BIOES_data(BIOESdata_path, vocab_path, taskname):
     return data
 
 
+# 读取BIOES数据，转换为模型所需的列表 -去除char_ids
+def read_BIOES_data_V2(BIOESdata_path, taskname):
+    '''
+    BIOES标注好的文本 读取后转换为模型所需列表
+    :param BIOESdata_path: BIOES标注好的文本路径
+    :param taskname: 根据任务类别 只取数据中对应类别的标签，其他标签置为O
+    :return:  data=[[sentence],[sentence],....]
+          sentence=[[chars],[tags],[tag_ids]]
+    '''
+    data = []
+    with io.open(BIOESdata_path, encoding='utf-8') as fr:
+        lines = fr.readlines()
+    tag2id = get_tag2id(taskname)
+
+    chars, tags, tag_ids = [], [], []
+    for line in lines:
+        if line != '\n':
+            # [char, label] = line.strip().split()
+            try:
+                char = ''.join(line).strip().split()[0]
+                chars.append(char)
+                if taskname == '':
+                    tag = ''.join(line).strip().split()[1]
+                    tags.append(tag)
+                    tag_id = tag2id_v0[tag]
+                    tag_ids.append(tag_id)
+                elif taskname == 'CLUE_ALL':
+                    tag = ''.join(line).strip().split()[1]
+                    tags.append(tag)
+                    tag_id = tag2id_CLUE[tag]
+                    tag_ids.append(tag_id)
+                else:
+                    tag = ''.join(line).strip().split()[1]
+                    tags.append(tag)
+                    tag_id = tag2id[tag] if tag in tag2id.keys() else 3
+                    tag_ids.append(tag_id)
+
+            except Exception as e:
+                print(line)
+                print('find error!!!!')
+                print(e)
+        else:
+            if len(chars) < 1 or len(tags) < 1:
+                continue
+            data.append((chars, tags, tag_ids))
+            chars, tags, tag_ids = [], [], []
+    print('------>已读取数据源 {} ! 其中包含{}个句子'.format(BIOESdata_path, len(data)))
+    # print(data)
+    return data
+
+
 # 原始data转换成batches
 def data_to_batches(data, batch_size, batch_num):
     '''
@@ -141,6 +203,8 @@ def data_to_batches(data, batch_size, batch_num):
     :return: [[one batch],[]...]
             one batch: [[sentence],...,[sentence]]
     '''
+    if batch_size >= len(data):
+        return data
     num_batches = len(data) // batch_size
     random.shuffle(data)
     batches = []
@@ -162,7 +226,6 @@ def get_batches_v1(train_data_path, batchsize, taskname=''):
     :param batchsize:
     :return:
     '''
-
     # 准备数据
     vocab_path = 'vocab/vocab.pkl'
     data = read_BIOES_data(train_data_path, vocab_path, taskname=taskname)
@@ -178,12 +241,22 @@ def get_batches_v2(train_data_path, batch_size, batch_num, taskname=''):
     batches = data_to_batches(data, batch_size, batch_num)
     return batches
 
+
 # 获得训练batches 包含tasks中的所有标签 V3
-def get_batches_v3(train_data_path_list:list, batch_size, batch_num, taskname=''):
+def get_batches_v3(train_data_path_list: list, batch_size, batch_num, taskname=''):
     vocab_path = 'vocab/vocab.pkl'
     batches = []
     for train_data_path in train_data_path_list:
         data = read_BIOES_data(train_data_path, vocab_path, taskname=taskname)
+        batches.extend(data_to_batches(data, batch_size, batch_num))
+    random.shuffle(batches)
+    return batches
+
+
+def get_batches_v4(train_data_path_list: list, batch_size, batch_num, taskname=''):
+    batches = []
+    for train_data_path in train_data_path_list:
+        data = read_BIOES_data_V2(train_data_path, taskname=taskname)
         batches.extend(data_to_batches(data, batch_size, batch_num))
     random.shuffle(batches)
     return batches
@@ -211,17 +284,43 @@ def get_train_data_from_batch(batch):
 
 
 # 将序列实际长度之后的位变为0
-def seq_masking(seqs, lens):
+def seq_masking(seqs, lens_plus2):
     '''
     将序列实际长度之后的位变为0
     :param seqs: [seqs_num, max_seq_len]
     :param lens: [seqs_num] 每一句的实际长度
     :return: [seqs_num, max_seq_len] 实际长度以后的位置都为0
     '''
-    maxl = max(lens) + 1
+    maxl = max(lens_plus2)
+    mask = tf.sequence_mask(lengths=lens_plus2, maxlen=maxl, dtype=tf.int32)
+    seqs_masked = seqs * mask
+    return seqs_masked
+
+
+def seq_masking_V2(seqs, lens):
+    '''
+    将序列实际长度之后的位变为0
+    :param seqs: [seqs_num, max_seq_len]
+    :param lens: [seqs_num] 每一句的实际长度
+    :return: [seqs_num, max_seq_len] 实际长度以后的位置都为0
+    '''
+    maxl = max(lens)
     mask = tf.sequence_mask(lengths=lens, maxlen=maxl, dtype=tf.int32)
     seqs_masked = seqs * mask
     return seqs_masked
+
+
+def pad_tag_ids(tag_ids):
+    '''
+
+    :param tag_ids:[ [sentence_tag_ids],[]... []]
+    :return:
+    '''
+    max_len = maxlen(tag_ids)
+    tag_ids_trans = [[1] + x + [2] for x in tag_ids]
+    tag_ids_padded = keras.preprocessing.sequence.pad_sequences(tag_ids_trans, maxlen=max_len + 2, padding='post',
+                                                                value=0)
+    return tag_ids_padded
 
 
 # 提取真实和预测的 有效序列标签 标签的偏移和混淆都不计入提取范围
@@ -267,21 +366,39 @@ def get_id2tag(tag_list, taskname):
     :param tag_list:  [batchsize, seq_length]
     :return: 一维list
     '''
+    tag2id = get_tag2id(taskname)
 
-    if type(taskname) is str:
-        tag2id = {
-            '<pad>': 0,
-            'O': 1,
-            'S-' + taskname: 2, 'B-' + taskname: 3, 'I-' + taskname: 4, 'E-' + taskname: 5,
-        }
-    elif type(taskname) is list:
-        tag2id = {
-            '<pad>': 0,
-            'O': 1}
-        for i,name in enumerate(taskname):
-            tag2id.update({'S-' + name: i*4+2, 'B-' + name: i*4+3, 'I-' + name: i*4+4, 'E-' + name: i*4+5,})
+    tag_list_flatten = np.array(tag_list).flatten()
+    if taskname == '':
+        id2tag = {tag2id_v0[k]: k for k in tag2id_v0.keys()}
+    elif taskname == 'CLUE_ALL':
+        id2tag = {tag2id_CLUE[k]: k for k in tag2id_CLUE.keys()}
     else:
-        raise TypeError('the arg:taskname must be a list or str!')
+        id2tag = {tag2id[k]: k for k in tag2id.keys()}
+    newtag_list = []
+    for i in range(len(tag_list_flatten)):
+        if tag_list_flatten[i] != 0:
+            if tag_list_flatten[i] in id2tag.keys():
+                newtag_list.append(id2tag[tag_list_flatten[i]])
+            else:
+                newtag_list.append('O')
+    return newtag_list, tag_list_flatten
+
+
+def get_id2tag_V2(tag_list_raw, lens_plus2, taskname):
+    '''
+
+    :param tag_list_raw:  [batchsize, seq_length] 其中 有 bert格式的'S-[CLS]' 和 'S-[SEP]' 标记
+    :param lens_plus2: 每个句子实际长度+2
+    :return: 一维list
+    '''
+    tag_list_r = np.array(tag_list_raw)
+    tag_list = []
+    for tags, length in zip(tag_list_r, lens_plus2):
+        t = np.concatenate([tags[1:length - 1], tags[length:]])
+        tag_list.append(t)
+
+    tag2id = get_tag2id(taskname)
 
     tag_list_flatten = np.array(tag_list).flatten()
     if taskname == '':
