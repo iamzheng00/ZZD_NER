@@ -51,6 +51,7 @@ class Model_NER(keras.Model):
         )
         self.dense = layers.Dense(self.tag_num)
         self.optimizer = conf.optimizer
+        attentionlayer = keras.layers.Attention()
 
     def call(self, inputs,training=None, mask=None):
         x = self.BiLSTM(inputs)
@@ -119,10 +120,10 @@ class Model_NER(keras.Model):
         with log_writer.as_default():
             # step = batch_num + 1 + inner_epochNum * batches_len
             tf.summary.scalar("loss", loss, step=inner_epochNum + outer_epochNum * inner_iters)
-            tf.summary.scalar("P", P_t, step=inner_epochNum)
-            tf.summary.scalar("R", R_t, step=inner_epochNum)
-            tf.summary.scalar("F", F1_t, step=inner_epochNum)
-        return (loss,F1_t)
+            tf.summary.scalar("P", P_t, step=inner_epochNum+ outer_epochNum * inner_iters)
+            tf.summary.scalar("R", R_t, step=inner_epochNum+ outer_epochNum * inner_iters)
+            tf.summary.scalar("F", F1_t, step=inner_epochNum+ outer_epochNum * inner_iters)
+        return (loss,P_t,R_t,F1_t)
 
 if __name__ == '__main__':
 

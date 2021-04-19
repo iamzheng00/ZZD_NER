@@ -54,25 +54,30 @@ for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 
 mod = 'BiLSTM'
-inner_iters = 8
+inner_iters = 1
+vali_train_iters = 1
 e = 0.1
 e_final = 0.001
-batch_size = 100
+batch_size = 10
 recordFileName = '_'.join(
-    ['record_3L_reptile+Bert' + mod, str(inner_iters) + 'i', str(e) + '-' + str(e_final) + 'e', str(batch_size) + 'bs'])
+    ['3L_reptile+Bert' + mod, str(inner_iters) + 'i',str(vali_train_iters)+'vi', str(e) + '-' + str(e_final) + 'e', str(batch_size) + 'bs'])
 create_record_dirs(recordFileName)
 epochNum = get_epochNum(recordFileName)  # 获取当前记录的epoch数
 
 # 配置模型参数、检查点
 configers = conf(choose_mod=mod)
 myModel = Model_NER(configers)
-ckpt_dir_inner = os.path.join(recordFileName, 'checkpoints')
-ckpt_dir_theta_0 = os.path.join(recordFileName, 'theta_0')
+ckpt_dir_inner = os.path.join('Records',recordFileName, 'checkpoints')
+ckpt_dir_theta_0 = os.path.join('Records',recordFileName, 'theta_0') # 存 每一轮外层循环后学到的初始参数
+ckpt_dir_theta_t = os.path.join('Records',recordFileName, 'theta_t') # 存 表现最佳的初始参数
+ckpt_dir_vali_theta = os.path.join('Records',recordFileName, 'theta_vali') # 存 在验证集测试时，模型训练过程中的参数
+
 ckpt_path_theta_0 = os.path.join(ckpt_dir_theta_0, 'ckpt_theta_0')
-ckpt_dir_theta_t = os.path.join(recordFileName, 'theta_t') # 用来存 在验证集上训练模型的最佳参数
-# ckpt_path_theta_t = os.path.join(ckpt_dir_theta_t, 'ckpt_theta_t')
-checkpoint = tf.train.Checkpoint(optimizer=myModel.optimizer, model=myModel)
-ckpt_manager = tf.train.CheckpointManager(checkpoint, directory=ckpt_dir_inner, max_to_keep=5)
+ckpt_path_theta_t = os.path.join(ckpt_dir_theta_t, 'ckpt_theta_t')
+ckpt_path_vali_theta = os.path.join(ckpt_dir_vali_theta, 'ckpt_theta_vali_train')
+maxPRF1filepath = os.path.join('Records',recordFileName,'mPRF1.txt')
+# checkpoint = tf.train.Checkpoint(optimizer=myModel.optimizer, model=myModel)
+# ckpt_manager = tf.train.CheckpointManager(checkpoint, directory=ckpt_dir_inner, max_to_keep=5)
 
 if epochNum == 0:
     myModel.save_weights(ckpt_path_theta_0)
@@ -82,9 +87,9 @@ else:
 # 配置tensorboard
 # log_dir_train = recordFileName + '/tensorboard/' + datetime.datetime.now().strftime("%Y%m%d-%H%M") + '-train'
 # log_dir_test = recordFileName + '/tensorboard/' + datetime.datetime.now().strftime("%Y%m%d-%H%M") + '-test'
-log_dir_train = recordFileName + '/tensorboard/' + '-train'
-log_dir_vali_train = recordFileName + '/tensorboard/' + '-vali_train'
-log_dir_vali_test = recordFileName + '/tensorboard/' + '-vali_test'
+log_dir_train = 'Records/' + recordFileName + '/tensorboard/' + '-train'
+log_dir_vali_train = 'Records/' + recordFileName + '/tensorboard/' + '-vali_train'
+log_dir_vali_test = 'Records/' + recordFileName + '/tensorboard/' + '-vali_test'
 log_writer_train = tf.summary.create_file_writer(log_dir_train)
 log_writer_vali_train = tf.summary.create_file_writer(log_dir_vali_train)
 log_writer_vali_test = tf.summary.create_file_writer(log_dir_vali_test)
@@ -106,7 +111,7 @@ vali_test_batch = get_batches_v4(train_data_path_list=vali_test_data_path, batch
                                  taskname=validation_tasks)
 
 vali_test_batch_pred = bert_embedding([vali_test_batch])[0]
-
+max_F1 = 0
 for epoch in range(epochNum, 1000):
     meta_step_size = epoch / 1000 * e_final + (1 - epoch / 1000) * e
     starttime = time.time()
@@ -125,11 +130,6 @@ for epoch in range(epochNum, 1000):
             path_list.append(p)
 
         print('task{}:{},{},{}================'.format(task_N, task_samples[0], task_samples[1], task_samples[2]))
-        # NER模型载入参数
-        # if epoch == 0:
-        #     myModel.load_weights(ckpt_path_theta_0)
-        # else:
-        #     myModel.load_weights(ckpt_path_theta_t)
         myModel.optimizer = tf.optimizers.Adam(learning_rate=0.002)
 
         # ==============内循环训练阶段===================
@@ -149,13 +149,11 @@ for epoch in range(epochNum, 1000):
         vars_list.append(myModel.get_weights())
         # 重置model参数为初始值
         myModel.load_weights(ckpt_path_theta_0)
-
+    #
     # 更新模型初始化参数theta_0
-    update_vars(myModel, vars_list, e)
+    reptile_update_vars(myModel, vars_list, e)
     myModel.save_weights(ckpt_path_theta_0)
 
-    # vali_data_path = 'data_tasks/' + vali_sample
-    # vali_train_batches = get_batches_v2(vali_data_path, batch_size=200, batch_num=3, taskname=vali_sample)
 
     # ===========验证阶段训练NER模型=============
     vali_train_batches = get_batches_v4(train_data_path_list=vali_train_data_paths, batch_size=batch_size, batch_num=1,
@@ -166,24 +164,30 @@ for epoch in range(epochNum, 1000):
         initial_learning_rate=0.005, decay_steps=1, decay_rate=0.96)
     myModel.optimizer = tf.optimizers.Adam(exponential_decay)
 
-    with tqdm(total=inner_iters) as bar:
-        maxF1 = 0
-        for i in range(inner_iters):
+    with tqdm(total=vali_train_iters) as bar:
+        # maxF1_t = 0
+        for i in range(vali_train_iters):
             _,F1_t = myModel.inner_train_one_step(vali_train_batches_pred, inner_iters=inner_iters, inner_epochNum=i,
                                          outer_epochNum=epoch,
                                          task_name=validation_tasks, log_writer=log_writer_vali_train)
-            if F1_t>maxF1:
-                maxF1 = F1_t
-                myModel.save_weights(ckpt_dir_theta_t)
+            # if F1_t>maxF1_t:
+            #     maxF1_t = F1_t
+            #     myModel.save_weights(ckpt_path_vali_theta)
             bar.update(1)
     # 在新数据上测试效果
     print('**********************************************\n validation in task:{}\n'
           '**********************************************\n'.format(validation_tasks))
+    # myModel.save_weights(ckpt_path_vali_theta)
 
     # 验证阶段 测试NER模型
     test_loss, pred_tags_masked, tag_ids_padded,P, R, F1 = myModel.validate_one_batch(vali_test_batch_pred, validation_tasks,
                                                                              log_writer_vali_test, epoch)
-
+    if F1 > max_F1:
+        max_F1 = F1
+        myModel.save_weights(ckpt_path_theta_t)
+        content = 'P\t{}\nR\t{}\nF1\t{}\n'.format(P,R,max_F1)
+        with open(maxPRF1filepath,'w',encoding='utf-8') as f:
+            f.write(content)
     # 记录epoch
     Record_epoch_num(recordFileName, epoch)
 

@@ -115,7 +115,7 @@ for epoch in range(epochNum, 1000):
         myModel.load_weights(ckpt_path_theta_0)
 
     # 更新模型初始化参数theta_0
-    update_vars(myModel, vars_list, e)
+    reptile_update_vars(myModel, vars_list, e)
     myModel.save_weights(ckpt_path_theta_0)
 
 

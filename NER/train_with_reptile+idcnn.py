@@ -82,7 +82,7 @@ for epoch in range(epochNum,epochNum + 1000):
         vars_list.append(myModel.get_weights())
 
     # 更新模型初始化参数
-    update_vars(myModel,vars_list,e)
+    reptile_update_vars(myModel, vars_list, e)
     myModel.save_weights(ckpt_path_theta_t)
 
     vali_sample = random.choice(validation_tasks)

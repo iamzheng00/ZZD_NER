@@ -455,7 +455,7 @@ def get_epochNum(recordFileName):
     :param recordFileName:
     :return:
     '''
-    epoch_dir = os.path.join(recordFileName, 'epoch_record')
+    epoch_dir = os.path.join('Records',recordFileName, 'epoch_record')
     if os.path.exists(epoch_dir):
         epoch_num = int(os.listdir(epoch_dir)[0])
     else:
@@ -475,24 +475,21 @@ def Record_epoch_num(recordFileName, epoch_num):
     :param epoch_num: 之前epoch值
     :return:  当前epoch值
     '''
-    epoch_dir = os.path.join(recordFileName, 'epoch_record')
-    os.chdir(epoch_dir)
-    new_num = epoch_num + 1
-    os.rename(str(epoch_num), str(new_num))
-    epoch_num = new_num
-    os.chdir('..')
-    os.chdir('..')
-    return epoch_num
+    epoch_path = os.path.join('Records', recordFileName, 'epoch_record',str(epoch_num))
+    epoch_new_path = os.path.join('Records', recordFileName, 'epoch_record',str(epoch_num+1))
+    os.rename(epoch_path, epoch_new_path)
+    return epoch_num+1
 
 
 # 创建实验记录的文件目录
 def create_record_dirs(recordname):
-    if not os.path.exists(recordname):
-        checkpoints_dir = recordname + '/checkpoints'
-        init_theta_dir = recordname + '/theta_0'
-        target_theta_dir = recordname + '/theta_t'
-        tensorboard_dir = recordname + '/tensorboard'
-        li = [checkpoints_dir, init_theta_dir, target_theta_dir, tensorboard_dir]
+    if not os.path.exists('Records/'+ recordname):
+        checkpoints_dir = 'Records/' + recordname + '/checkpoints'
+        init_theta_dir = 'Records/' + recordname + '/theta_0'
+        target_theta_dir = 'Records/' + recordname + '/theta_t'
+        vali_train_theta_dir = 'Records/' + recordname + '/theta_vali_train'
+        tensorboard_dir = 'Records/' + recordname + '/tensorboard'
+        li = [checkpoints_dir, init_theta_dir, target_theta_dir, vali_train_theta_dir, tensorboard_dir]
         for p in li:
             os.makedirs(p)
 
@@ -517,7 +514,7 @@ def average_vars(vars_list):
 
 
 # outer loop 更新参数
-def update_vars(myModel, vars_list, epsilon):
+def reptile_update_vars(myModel, vars_list, epsilon):
     t_var = average_vars(vars_list)
     oldvar = myModel.get_weights()
     newvar = [v2 + epsilon * (v1 - v2) for v1, v2 in zip(t_var, oldvar)]
