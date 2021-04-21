@@ -17,7 +17,7 @@ for gpu in gpus:
 
 
 class conf():
-    def __init__(self,choose_mod=None):
+    def __init__(self, choose_mod=None):
 
         self.tag_num = 16
         self.optimizer = tf.optimizers.Adam(learning_rate=0.005)
@@ -29,13 +29,33 @@ class conf():
             self.mod = choose_mod
 
 
+class Self_Attention(keras.layers.Layer):
+    def __init__(self, units, dropout=0):
+        super(Self_Attention, self).__init__()
+        # self.WQ = layers.Dense(units, use_bias=False, trainable=True)
+        # self.WK = layers.Dense(units, use_bias=False, trainable=True)
+        # self.scale_k = units ** 0.5
+        self.softmax = layers.Softmax()
+
+    # def build(self, input_shape):
+    #     self.W = self.add_variable('attention_variable',
+    #                                shape=[int(input_shape[-1]),int(input_shape[-1])] )
+
+    def call(self, input, **kwargs):
+        Q = K = tf.nn.tanh(input)
+        scaled_k = (Q.shape[-1])**0.5
+        # scores = tf.matmul(tf.matmul(input,self.W),input,transpose_b=True)
+        scores = tf.matmul(Q, K, transpose_b=True)
+        a = self.softmax(scores / scaled_k)
+        c = tf.matmul(a, input)
+        return c
 
 
 class Model_NER(keras.Model):
     """
     没有embedding层，需做额外的embedding 再输入
     """
-    def __init__(self, conf:conf):
+    def __init__(self, conf: conf):
         super(Model_NER, self).__init__()
         self.mod = conf.mod
 
@@ -51,10 +71,13 @@ class Model_NER(keras.Model):
         )
         self.dense = layers.Dense(self.tag_num)
         self.optimizer = conf.optimizer
-        attentionlayer = keras.layers.Attention()
+        self.attentionlayer = Self_Attention(100)
+        # self.attentionlayer = layers.Attention()
+        self.mask = layers.Masking()
 
-    def call(self, inputs,training=None, mask=None):
+    def call(self, inputs, training=None, mask=None):
         x = self.BiLSTM(inputs)
+        # x = self.attentionlayer(x)
         x = self.dense(x)
         return x
 
@@ -81,9 +104,9 @@ class Model_NER(keras.Model):
         t_tags_char, _ = get_id2tag_V2(tag_ids_padded, seq_len_list_plus2, taskname=task_name)
         (P, R, F1), _ = evaluate(t_tags_char, p_tags_char, verbose=True)
         write_to_log(loss, P, R, F1, t_tags_char, log_writer, epoch)
-        return (loss, pred_tags_masked, tag_ids_padded,P, R, F1)
+        return (loss, pred_tags_masked, tag_ids_padded, P, R, F1)
 
-    def inner_train_one_step(self,batches, inner_iters, inner_epochNum, outer_epochNum, task_name,
+    def inner_train_one_step(self, batches, inner_iters, inner_epochNum, outer_epochNum, task_name,
                              log_writer):
         '''
         :param self:
@@ -98,10 +121,10 @@ class Model_NER(keras.Model):
         # =====run model=======
         for batch_num in range(batches_len):
             batch = batches[batch_num]
-            seq_embeddings= batch['emb']
-            tag_ids= batch['tag_ids']
+            seq_embeddings = batch['emb']
+            tag_ids = batch['tag_ids']
             seq_len_list = batch['lens']
-            seq_len_list_plus2 = [x+2 for x in seq_len_list]
+            seq_len_list_plus2 = [x + 2 for x in seq_len_list]
             tag_ids_padded = pad_tag_ids(tag_ids)
 
             with tf.GradientTape() as tape:
@@ -120,15 +143,15 @@ class Model_NER(keras.Model):
         with log_writer.as_default():
             # step = batch_num + 1 + inner_epochNum * batches_len
             tf.summary.scalar("loss", loss, step=inner_epochNum + outer_epochNum * inner_iters)
-            tf.summary.scalar("P", P_t, step=inner_epochNum+ outer_epochNum * inner_iters)
-            tf.summary.scalar("R", R_t, step=inner_epochNum+ outer_epochNum * inner_iters)
-            tf.summary.scalar("F", F1_t, step=inner_epochNum+ outer_epochNum * inner_iters)
-        return (loss,P_t,R_t,F1_t)
+            tf.summary.scalar("P", P_t, step=inner_epochNum + outer_epochNum * inner_iters)
+            tf.summary.scalar("R", R_t, step=inner_epochNum + outer_epochNum * inner_iters)
+            tf.summary.scalar("F", F1_t, step=inner_epochNum + outer_epochNum * inner_iters)
+        return (loss, P_t, R_t, F1_t)
+
 
 if __name__ == '__main__':
-
     cof = conf()
     model = Model_NER(cof)
-    e = tf.ones([200,52,768])
+    e = tf.ones([200, 52, 768])
     x = model(e)
     print(model.BiLSTM.trainable_variables)

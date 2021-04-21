@@ -261,6 +261,26 @@ def get_batches_v4(train_data_path_list: list, batch_size, batch_num, taskname='
     random.shuffle(batches)
     return batches
 
+def get_batch_FS(train_data_path_list: list, S_size, Q_size, taskname=''):
+    '''
+
+    :param train_data_path_list:
+    :param S_size:
+    :param Q_size:
+    :param taskname:
+    :return: [S,Q]
+    '''
+    S,Q = [],[]
+    for train_data_path in train_data_path_list:
+        data = read_BIOES_data_V2(train_data_path, taskname=taskname)
+        random.shuffle(data)
+        S.extend(data[:S_size])
+        Q.extend(data[S_size:S_size + Q_size])
+    if S and Q:
+        return [S,Q]
+    else:
+        raise TypeError('wrong S and Q!')
+
 
 # 从批数据中 分离出seq_ids 和 tag_ids,以及每一句的长度列表：seq_len_list
 def get_train_data_from_batch(batch):
