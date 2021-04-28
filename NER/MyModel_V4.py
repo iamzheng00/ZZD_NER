@@ -62,7 +62,6 @@ class Model_NER(keras.Model):
         # 模型基本参数
         self.tag_num = conf.tag_num
         # 模型所需的层定义
-
         self.LSTM1 = layers.LSTM(300, return_sequences=True, go_backwards=False)
         self.LSTM2 = layers.LSTM(300, return_sequences=True, go_backwards=True)
         self.BiLSTM = layers.Bidirectional(self.LSTM1, backward_layer=self.LSTM2)
@@ -71,7 +70,8 @@ class Model_NER(keras.Model):
         )
         self.dense = layers.Dense(self.tag_num)
         self.optimizer = conf.optimizer
-        self.attentionlayer = Self_Attention(100)
+        self.finetune_optimizer = tf.optimizers.Adam(learning_rate=0.0001)
+        # self.attentionlayer = Self_Attention(100)
         # self.attentionlayer = layers.Attention()
         self.mask = layers.Masking()
 
@@ -88,10 +88,11 @@ class Model_NER(keras.Model):
         loss = tf.reduce_mean(-likehood)
         return loss
 
-    def validate_one_batch(self, test_batch, task_name, log_writer, epoch):
-        seq_embeddings = test_batch['emb']
-        tag_ids = test_batch['tag_ids']
-        seq_len_list = test_batch['lens']
+    def validate_one_batches(self, test_batches, task_name, log_writer, epoch):
+
+        seq_embeddings = test_batches['emb']
+        tag_ids = test_batches['tag_ids']
+        seq_len_list = test_batches['lens']
         seq_len_list_plus2 = [x + 2 for x in seq_len_list]
         tag_ids_padded = pad_tag_ids(tag_ids)
 
@@ -107,7 +108,7 @@ class Model_NER(keras.Model):
         return (loss, pred_tags_masked, tag_ids_padded, P, R, F1)
 
     def inner_train_one_step(self, batches, inner_iters, inner_epochNum, outer_epochNum, task_name,
-                             log_writer):
+                             log_writer,mod='pretrain'):
         '''
         :param self:
         :param batches: one batch data: [[sentence],[sentence],....]
@@ -127,13 +128,19 @@ class Model_NER(keras.Model):
             seq_len_list_plus2 = [x + 2 for x in seq_len_list]
             tag_ids_padded = pad_tag_ids(tag_ids)
 
-            with tf.GradientTape() as tape:
+            with tf.GradientTape(persistent=True) as tape:
                 logits = self(seq_embeddings)
                 loss = self.crf_loss(logits, tag_ids_padded, seq_len_list_plus2)
                 pred_tags, pred_best_score = crf.crf_decode(potentials=logits, transition_params=self.trans_p,
                                                             sequence_length=seq_len_list_plus2)
-            grads = tape.gradient(loss, self.trainable_variables)
-            self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+            grads = tape.gradient(loss, self.trans_p)
+            self.optimizer.apply_gradients(zip(grads, self.trans_p))
+            grads = tape.gradient(loss, self.dense.trainable_variables)
+            self.optimizer.apply_gradients(zip(grads, self.dense.trainable_variables))
+            if mod == 'pretrain':
+                grads = tape.gradient(loss, self.BiLSTM.trainable_variables)
+                self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+            del tape
             # optimizer.minimize(loss, [myModel_bilstm.trainable_variables])
 
         pred_tags_masked = seq_masking(pred_tags, seq_len_list_plus2)

@@ -11,13 +11,12 @@ from tqdm import tqdm
 from conlleval import evaluate
 from transformers import BertTokenizer, TFBertModel
 
-# lstm1 = layers.LSTM(300, return_sequences=True, go_backwards=False)
-# lstm2 = layers.LSTM(300, return_sequences=True, go_backwards=True)
-# bilstm = layers.Bidirectional(lstm1, backward_layer=lstm2)
-# dense = layers.Dense(3)
 
-tokenizer = BertTokenizer.from_pretrained('bert-base-chinese')
-bertmodel = TFBertModel.from_pretrained('bert-base-chinese')
+tokenizer_savepath = 'bert/tokenizer'
+bertmodel_savepath = 'bert/model'
+
+tokenizer = BertTokenizer.from_pretrained(tokenizer_savepath)
+bertmodel = TFBertModel.from_pretrained(bertmodel_savepath)
 
 
 def bert_embedding(batches):
@@ -56,7 +55,7 @@ for gpu in gpus:
 mod = 'BiLSTM'
 batch_size = 100
 recordFileName = '_'.join(
-    ['3L_Bert',  str(batch_size) + 'bs','pre+ft','address-scene-government'])
+    ['3L_BertBiLSTM',  str(batch_size) + 'bs','pre+ft','movie-scene-government'])
 create_record_dirs(recordFileName)
 epochNum = get_epochNum(recordFileName)  # 获取当前记录的epoch数
 
@@ -85,43 +84,49 @@ else:
 #-------------------------------------------------------
 
 log_dir_train = 'Records/' + recordFileName + '/tensorboard/' + '-train'
-log_dir_vali_train = 'Records/' + recordFileName + '/tensorboard/' + '-vali_train'
-log_dir_vali_test = 'Records/' + recordFileName + '/tensorboard/' + '-vali_test'
+log_dir_vali = 'Records/' + recordFileName + '/tensorboard/' + '-vali'
+log_dir_test_train = 'Records/' + recordFileName + '/tensorboard/' + '-test_train'
+log_dir_test_vali = 'Records/' + recordFileName + '/tensorboard/' + '-test_vali'
 log_writer_train = tf.summary.create_file_writer(log_dir_train)
-log_writer_vali_train = tf.summary.create_file_writer(log_dir_vali_train)
-log_writer_vali_test = tf.summary.create_file_writer(log_dir_vali_test)
+log_writer_vali = tf.summary.create_file_writer(log_dir_vali)
+log_writer_vali_train = tf.summary.create_file_writer(log_dir_test_train)
+log_writer_vali_test = tf.summary.create_file_writer(log_dir_test_vali)
 #-------------------------------------------------------
 
 print('record files is created!\n'
       '-----------------------------------------------------------\n')
 
-train_tasks = ['address', 'scene', 'government', 'organization',
-               'company', 'name', 'book']
-validation_tasks = ['game', 'position', 'movie']
+train_tasks = ['address', 'game', 'organization',
+               'company', 'name', 'book','position']
+test_tasks = ['government', 'scene', 'movie']
 
 
 # 获取预训练的训练集数据： 分两部分，预训练_训练集 和 预训练_测试集
 #-------------------------------------------------------
-labels = train_tasks[:3]
 train_batches = []
-for t in labels:
-    pass  # TODO: 构建预训练的训练集和验证集
+pre_train_data_path = os.path.join('data', 'CLUE_BIOES_train')
+pre_vali_data_path = os.path.join('data', 'CLUE_BIOES_dev')
+pre_train_batches = get_batches_v1(train_data_path=pre_train_data_path, batchsize=200, taskname=train_tasks)
+pre_vali_batches = get_batches_v1(train_data_path=pre_vali_data_path, batchsize=200, taskname=train_tasks)
+
+pre_train_batch_pred = bert_embedding(pre_train_batches)
+pre_vali_batches_pred = bert_embedding(pre_vali_batches)
 
 
-# 获取验证集数据： 验证集分两部分，验证_训练集 和 验证_测试集
+# 获取测试集数据： 测试集分两部分，测试_训练集 和 测试_测试集
 #-------------------------------------------------------
-vali_train_data_paths = []
-for t in validation_tasks:
+test_train_data_paths = []
+for t in test_tasks:
     temp = os.path.join('data_tasks', t)
-    vali_train_data_paths.append(temp)
-vali_train_batches = get_batches_v4(train_data_path_list=vali_train_data_paths, batch_size=batch_size, batch_num=1,
-                                        taskname=validation_tasks)
-vali_test_data_path = ['data/CLUE_BIOES_dev']
-vali_test_batch = get_batches_v4(train_data_path_list=vali_test_data_path, batch_size=10000, batch_num=1,
-                                 taskname=validation_tasks)
+    test_train_data_paths.append(temp)
+test_train_batches = get_batches_v4(train_data_path_list=test_train_data_paths, batch_size=batch_size, batch_num=1,
+                                    taskname=test_tasks)
+test_vali_data_path = ['data/CLUE_BIOES_dev']
+test_vali_batches = get_batches_v4(train_data_path_list=test_vali_data_path, batch_size=500, batch_num=1,
+                                 taskname=test_tasks)
 
-vali_test_batch_pred = bert_embedding([vali_test_batch])[0]
-vali_train_batches_pred = bert_embedding(vali_train_batches)
+test_train_batches_pred = bert_embedding(test_train_batches)
+test_vali_batch_pred = bert_embedding(test_vali_batches)
 #-------------------------------------------------------
 
 # 指数衰减学习率
@@ -129,28 +134,47 @@ exponential_decay = tf.keras.optimizers.schedules.ExponentialDecay(
     initial_learning_rate=0.005, decay_steps=1, decay_rate=0.96)
 myModel.optimizer = tf.optimizers.Adam(exponential_decay)
 
-max_F1 = 0
-# 训练开始
+# 预训练开始
 #-------------------------------------------------------
+max_F1 = 0
 for epoch in range(epochNum, 500):
     starttime = time.time()
-    loss_t,P_t,R_T,F1_t = myModel.inner_train_one_step(vali_train_batches_pred, inner_iters=0, inner_epochNum=epoch,
-                                 outer_epochNum=0,
-                                 task_name=validation_tasks, log_writer=log_writer_vali_train)
+    loss_t,P_t,R_T,F1_t = myModel.inner_train_one_step(pre_train_batch_pred, inner_iters=0, inner_epochNum=epoch,
+                                                       outer_epochNum=0,
+                                                       task_name=train_tasks, log_writer=log_writer_train,mod='pretrain')
     myModel.save_weights(ckpt_path_theta_0)
     print('train loss:{}, train F1:{} <-----------------\n'.format(loss_t,F1_t))
     print('**********************************************\n')
     # 在测试集上看结果
-    test_loss, pred_tags_masked, tag_ids_padded,P, R, F1 = myModel.validate_one_batch(vali_test_batch_pred, validation_tasks,
-                                                                             log_writer_vali_test, epoch)
+    test_loss, pred_tags_masked, tag_ids_padded,P, R, F1 = myModel.validate_one_batches(pre_vali_batches, train_tasks,
+                                                                                        log_writer_vali, epoch)
+
+    if F1 > max_F1:
+        max_F1 = F1
+        myModel.save_weights(ckpt_path_theta_t)
+
+    # 记录epoch
+    Record_epoch_num(recordFileName, epoch)
+
+    endtime = time.time()
+    print('done inner epoch:{}!——————run time ：{}s**********************************************.\n'.format(epoch, str(endtime - starttime)))
+
+# 微调阶段
+#-------------------------------------------------------
+max_F1 = 0
+for epoch in range(100):
+    loss_t, P_t, R_T, F1_t = myModel.inner_train_one_step(test_train_batches_pred, inner_iters=0, inner_epochNum=epoch,
+                                                          outer_epochNum=0,
+                                                          task_name=test_tasks, log_writer=log_writer_vali_train,mod='finetune')
+    myModel.save_weights(ckpt_path_theta_0)
+    print('train loss:{}, train F1:{} <-----------------\n'.format(loss_t, F1_t))
+    print('**********************************************\n')
+    # 在测试集上看结果
+    test_loss, pred_tags_masked, tag_ids_padded, P, R, F1 = myModel.validate_one_batches(test_vali_batch_pred, test_tasks,
+                                                                                         log_writer_vali_test, epoch)
     if F1 > max_F1:
         max_F1 = F1
         myModel.save_weights(ckpt_path_theta_t)
         content = 'P\t{}\nR\t{}\nF1\t{}\n'.format(P,R,max_F1)
         with open(maxPRF1filepath,'w',encoding='utf-8') as f:
             f.write(content)
-    # 记录epoch
-    Record_epoch_num(recordFileName, epoch)
-
-    endtime = time.time()
-    print('done inner epoch:{}!——————run time ：{}s**********************************************.\n'.format(epoch, str(endtime - starttime)))

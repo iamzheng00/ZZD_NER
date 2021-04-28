@@ -218,7 +218,7 @@ def data_to_batches(data, batch_size, batch_num):
 
 
 # 获得训练batches V1
-def get_batches_v1(train_data_path, batchsize, taskname=''):
+def get_batches_v1(train_data_path, batchsize, taskname):
     '''
     从data_split目录中选取 已划分为200句一个文件的训练数据
     :param train_data_path:
@@ -228,7 +228,7 @@ def get_batches_v1(train_data_path, batchsize, taskname=''):
     '''
     # 准备数据
     vocab_path = 'vocab/vocab.pkl'
-    data = read_BIOES_data(train_data_path, vocab_path, taskname=taskname)
+    data = read_BIOES_data_V2(train_data_path, taskname=taskname)
     batch_num = len(data) // batchsize
     batches = data_to_batches(data, batch_size=batchsize, batch_num=batch_num)
     return batches

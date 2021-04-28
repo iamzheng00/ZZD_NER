@@ -132,8 +132,8 @@ for epoch in range(epochNum, 500):
     print('train loss:{}, train F1:{} <-----------------\n'.format(loss_t,F1_t))
     print('**********************************************\n')
     # 在测试集上看结果
-    test_loss, pred_tags_masked, tag_ids_padded,P, R, F1 = myModel.validate_one_batch(vali_test_batch_pred, validation_tasks,
-                                                                             log_writer_vali_test, epoch)
+    test_loss, pred_tags_masked, tag_ids_padded,P, R, F1 = myModel.validate_one_batches(vali_test_batch_pred, validation_tasks,
+                                                                                        log_writer_vali_test, epoch)
     if F1 > max_F1:
         max_F1 = F1
         myModel.save_weights(ckpt_path_theta_t)

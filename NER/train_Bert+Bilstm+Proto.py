@@ -18,7 +18,6 @@ bertmodel_savepath = 'bert/model'
 tokenizer = BertTokenizer.from_pretrained(tokenizer_savepath)
 bertmodel = TFBertModel.from_pretrained(bertmodel_savepath)
 
-
 def bert_embedding(batches):
 
     batches_prd = []
@@ -54,7 +53,7 @@ for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 
 mod = 'BiLSTM+proto'
-batch_size = 100
+batch_size = 2
 recordFileName = '_'.join(
     ['3L_Bert' + mod,  str(batch_size) + 'bs'])
 create_record_dirs(recordFileName)

@@ -11,13 +11,13 @@ from tqdm import tqdm
 from conlleval import evaluate
 from transformers import BertTokenizer, TFBertModel
 
-# lstm1 = layers.LSTM(300, return_sequences=True, go_backwards=False)
-# lstm2 = layers.LSTM(300, return_sequences=True, go_backwards=True)
-# bilstm = layers.Bidirectional(lstm1, backward_layer=lstm2)
-# dense = layers.Dense(3)
+tokenizer_savepath = 'bert/tokenizer'
+bertmodel_savepath = 'bert/model'
 
-tokenizer = BertTokenizer.from_pretrained('bert-base-chinese')
-bertmodel = TFBertModel.from_pretrained('bert-base-chinese')
+tokenizer = BertTokenizer.from_pretrained(tokenizer_savepath)
+bertmodel = TFBertModel.from_pretrained(bertmodel_savepath)
+
+
 
 
 def bert_embedding(batches):
@@ -180,8 +180,8 @@ for epoch in range(epochNum, 1000):
     # myModel.save_weights(ckpt_path_vali_theta)
 
     # 验证阶段 测试NER模型
-    test_loss, pred_tags_masked, tag_ids_padded,P, R, F1 = myModel.validate_one_batch(vali_test_batch_pred, validation_tasks,
-                                                                             log_writer_vali_test, epoch)
+    test_loss, pred_tags_masked, tag_ids_padded,P, R, F1 = myModel.validate_one_batches(vali_test_batch_pred, validation_tasks,
+                                                                                        log_writer_vali_test, epoch)
     if F1 > max_F1:
         max_F1 = F1
         myModel.save_weights(ckpt_path_theta_t)
